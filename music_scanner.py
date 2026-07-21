@@ -8,11 +8,11 @@ AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.o
 
 # Curated dynamic album cover gradients matching user palette
 GLASS_PALETTES = [
-    ["#BBBDF6", "#9893DA"],
-    ["#9893DA", "#797A9E"],
-    ["#797A9E", "#625F63"],
-    ["#BBBDF6", "#72727E"],
-    ["#9893DA", "#625F63"]
+    ["#471396", "#B13BFF"],
+    ["#B13BFF", "#FFCC00"],
+    ["#090040", "#471396"],
+    ["#4C3BCF", "#3DC2EC"],
+    ["#4B70F5", "#B13BFF"]
 ]
 
 class MusicScanner:

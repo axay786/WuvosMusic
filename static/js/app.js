@@ -49,18 +49,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Theme Switcher
   function initTheme(theme) {
+    if (theme !== 'ocean') theme = 'default';
+
     document.documentElement.setAttribute('data-theme', theme);
     state.theme = theme;
     localStorage.setItem('wuvos_theme', theme);
-    if (theme === 'dark') {
-      themeLabel.innerHTML = '<i class="ri-moon-line"></i> Dark Theme';
+
+    if (theme === 'default') {
+      themeLabel.innerHTML = '<i class="ri-sparkling-fill" style="color:#FFCC00;"></i> Neon Gold';
     } else {
-      themeLabel.innerHTML = '<i class="ri-sun-line"></i> Light Theme';
+      themeLabel.innerHTML = '<i class="ri-drop-fill" style="color:#3DC2EC;"></i> Ocean Cyan';
     }
   }
 
   function toggleTheme() {
-    const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+    const nextTheme = state.theme === 'default' ? 'ocean' : 'default';
     initTheme(nextTheme);
   }
 
@@ -106,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const catGrid = document.getElementById('categories-grid');
     catGrid.innerHTML = `
       <div class="music-card" onclick="filterByLang('English')">
-        <div class="card-cover" style="background: linear-gradient(135deg, #BBBDF6, #9893DA);">
+        <div class="card-cover" style="background: linear-gradient(135deg, #471396, #B13BFF);">
           <i class="ri-global-line"></i>
           <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
         </div>
@@ -116,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
 
       <div class="music-card" onclick="filterByLang('Hindi')">
-        <div class="card-cover" style="background: linear-gradient(135deg, #9893DA, #797A9E);">
+        <div class="card-cover" style="background: linear-gradient(135deg, #B13BFF, #FFCC00);">
           <i class="ri-music-2-line"></i>
           <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
         </div>
@@ -126,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
 
       <div class="music-card" onclick="filterByQuality('flac')">
-        <div class="card-cover" style="background: linear-gradient(135deg, #797A9E, #625F63);">
+        <div class="card-cover" style="background: linear-gradient(135deg, #4C3BCF, #3DC2EC);">
           <i class="ri-vip-diamond-line"></i>
           <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
         </div>

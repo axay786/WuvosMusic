@@ -1,0 +1,11 @@
+# Ignore APK directory and all contents
+APK/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local data & environment files
+playlists.json
+.env

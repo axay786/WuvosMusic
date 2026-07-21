@@ -2,34 +2,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  /* User Palette Tokens */
-  --c-periwinkle: #BBBDF6;
-  --c-violet: #9893DA;
-  --c-gray-violet: #797A9E;
-  --c-slate: #72727E;
-  --c-charcoal: #625F63;
+  /* Default Palette 1 Tokens (#090040, #471396, #B13BFF, #FFCC00) */
+  --c-navy: #090040;
+  --c-purple: #471396;
+  --c-violet: #B13BFF;
+  --c-gold: #FFCC00;
 
-  /* Theme Defaults - DARK THEME (DEFAULT) */
-  --bg-main: #131217;
-  --bg-gradient: radial-gradient(circle at 10% 20%, rgba(152, 147, 218, 0.18) 0%, rgba(19, 18, 23, 0.98) 70%),
-                  radial-gradient(circle at 90% 80%, rgba(187, 189, 246, 0.12) 0%, rgba(98, 95, 99, 0.2) 100%);
+  /* Theme Defaults - DEFAULT THEME (Midnight Gold) */
+  --bg-main: #090040;
+  --bg-gradient: radial-gradient(circle at 10% 20%, rgba(71, 19, 150, 0.6) 0%, rgba(9, 0, 64, 0.98) 70%),
+                  radial-gradient(circle at 90% 80%, rgba(177, 59, 255, 0.25) 0%, rgba(9, 0, 64, 0.95) 100%);
   
-  --glass-panel-bg: rgba(30, 28, 38, 0.55);
-  --glass-panel-border: rgba(187, 189, 246, 0.18);
-  --glass-panel-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --glass-hover-bg: rgba(152, 147, 218, 0.22);
-  --glass-active-bg: rgba(187, 189, 246, 0.28);
+  --glass-panel-bg: rgba(71, 19, 150, 0.35);
+  --glass-panel-border: rgba(177, 59, 255, 0.28);
+  --glass-panel-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  --glass-hover-bg: rgba(177, 59, 255, 0.25);
+  --glass-active-bg: rgba(255, 204, 0, 0.25);
 
-  --text-primary: #F4F4FD;
-  --text-secondary: #B1B3D6;
-  --text-muted: #797A9E;
+  --text-primary: #FFFFFF;
+  --text-secondary: #E3CEFF;
+  --text-muted: #A084D0;
 
-  --accent-primary: #9893DA;
-  --accent-light: #BBBDF6;
-  --accent-glow: rgba(187, 189, 246, 0.35);
+  --accent-primary: #B13BFF;
+  --accent-light: #FFCC00;
+  --accent-glow: rgba(177, 59, 255, 0.45);
 
-  --sidebar-bg: rgba(20, 19, 26, 0.65);
-  --player-bar-bg: rgba(25, 23, 33, 0.75);
+  --sidebar-bg: rgba(15, 6, 60, 0.75);
+  --player-bar-bg: rgba(15, 6, 60, 0.88);
 
   --radius-lg: 20px;
   --radius-md: 14px;
@@ -37,24 +36,28 @@
   --transition-smooth: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-[data-theme="light"] {
-  /* LIGHT THEME OVERRIDES */
-  --bg-main: #EFEFF9;
-  --bg-gradient: radial-gradient(circle at 10% 20%, rgba(187, 189, 246, 0.4) 0%, rgba(239, 239, 249, 0.98) 70%),
-                  radial-gradient(circle at 90% 80%, rgba(152, 147, 218, 0.25) 0%, rgba(220, 222, 245, 0.6) 100%);
+[data-theme="ocean"] {
+  /* OPTIONAL THEME OVERRIDES (#402E7A, #4C3BCF, #4B70F5, #3DC2EC) */
+  --bg-main: #20174A;
+  --bg-gradient: radial-gradient(circle at 10% 20%, rgba(76, 59, 207, 0.55) 0%, rgba(64, 46, 122, 0.98) 70%),
+                  radial-gradient(circle at 90% 80%, rgba(61, 194, 236, 0.3) 0%, rgba(75, 112, 245, 0.35) 100%);
 
-  --glass-panel-bg: rgba(255, 255, 255, 0.65);
-  --glass-panel-border: rgba(152, 147, 218, 0.28);
-  --glass-panel-shadow: 0 8px 32px 0 rgba(121, 122, 158, 0.15);
-  --glass-hover-bg: rgba(152, 147, 218, 0.18);
-  --glass-active-bg: rgba(187, 189, 246, 0.35);
+  --glass-panel-bg: rgba(76, 59, 207, 0.35);
+  --glass-panel-border: rgba(61, 194, 236, 0.32);
+  --glass-panel-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+  --glass-hover-bg: rgba(75, 112, 245, 0.25);
+  --glass-active-bg: rgba(61, 194, 236, 0.3);
 
-  --text-primary: #1C1A24;
-  --text-secondary: #4E4B5E;
-  --text-muted: #72727E;
+  --text-primary: #FFFFFF;
+  --text-secondary: #D4E8FF;
+  --text-muted: #8AAAD8;
 
-  --sidebar-bg: rgba(240, 240, 250, 0.7);
-  --player-bar-bg: rgba(245, 245, 255, 0.82);
+  --accent-primary: #4B70F5;
+  --accent-light: #3DC2EC;
+  --accent-glow: rgba(61, 194, 236, 0.45);
+
+  --sidebar-bg: rgba(30, 20, 75, 0.78);
+  --player-bar-bg: rgba(30, 20, 75, 0.88);
 }
 
 * {
