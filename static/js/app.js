@@ -326,6 +326,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function playNextSong() {
     if (state.queue.length === 0) return;
+
+    // If Repeat Single Song mode is active, loop current song
+    if (state.repeatMode === 'one') {
+      audio.currentTime = 0;
+      audio.play().then(() => {
+        state.isPlaying = true;
+        ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
+        playerCover.classList.add('playing');
+      }).catch(err => console.error('Loop playback error:', err));
+      return;
+    }
+
     if (state.isShuffle) {
       const randIdx = Math.floor(Math.random() * state.queue.length);
       playSongByIndex(randIdx);
@@ -337,6 +349,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function playPrevSong() {
     if (state.queue.length === 0) return;
+
+    // If Repeat Single Song mode is active, loop current song
+    if (state.repeatMode === 'one') {
+      audio.currentTime = 0;
+      audio.play().then(() => {
+        state.isPlaying = true;
+        ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
+        playerCover.classList.add('playing');
+      }).catch(err => console.error('Loop playback error:', err));
+      return;
+    }
+
     const prevIdx = (state.currentIndex - 1 + state.queue.length) % state.queue.length;
     playSongByIndex(prevIdx);
   }
