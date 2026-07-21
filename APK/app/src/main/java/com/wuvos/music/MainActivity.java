@@ -3,16 +3,18 @@ package com.wuvos.music;
 import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.os.Build;
 import android.os.Bundle;
-import android.view.KeyEvent;
-import android.view.View;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
@@ -39,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
-        webSettings.setDatabaseEnabled(true);
         webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);
@@ -50,18 +51,20 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                progressBar.setVisibility(View.VISIBLE);
+                progressBar.setVisibility(ProgressBar.VISIBLE);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                progressBar.setVisibility(View.GONE);
+                progressBar.setVisibility(ProgressBar.GONE);
                 swipeRefreshLayout.setRefreshing(false);
             }
 
             @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                Toast.makeText(MainActivity.this, "Connection Notice: " + description, Toast.LENGTH_SHORT).show();
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Toast.makeText(MainActivity.this, "Connection Notice: " + error.getDescription(), Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
@@ -69,24 +72,27 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 if (newProgress == 100) {
-                    progressBar.setVisibility(View.GONE);
+                    progressBar.setVisibility(ProgressBar.GONE);
                 } else {
-                    progressBar.setVisibility(View.VISIBLE);
+                    progressBar.setVisibility(ProgressBar.VISIBLE);
                 }
             }
         });
 
         swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
 
-        webView.loadUrl(serverUrl);
-    }
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack();
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        });
 
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
-            webView.goBack();
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
+        webView.loadUrl(serverUrl);
     }
 }
