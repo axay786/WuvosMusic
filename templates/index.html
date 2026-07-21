@@ -26,6 +26,9 @@
           <i class="ri-disc-line"></i>
         </div>
         <div class="brand-name">Wuvos</div>
+        <button class="sidebar-close-btn" id="mobile-sidebar-close" aria-label="Close Menu">
+          <i class="ri-close-line"></i>
+        </button>
       </div>
 
       <nav class="nav-section">
@@ -90,11 +93,18 @@
       </div>
     </aside>
 
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     <!-- Main View Workspace -->
     <main class="main-view">
       
       <!-- Top Bar Header -->
       <header class="top-header glass-panel">
+        <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle Menu">
+          <i class="ri-menu-line"></i>
+        </button>
+
         <div class="search-bar-container">
           <i class="ri-search-line"></i>
           <input type="text" id="global-search" class="search-input" placeholder="Search title, artist, language, FLAC...">

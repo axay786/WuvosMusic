@@ -362,6 +362,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- EVENT LISTENERS ---
   function setupEventListeners() {
+    // Mobile Sidebar Drawer
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+
+    function closeSidebar() {
+      if (sidebar) sidebar.classList.remove('open');
+      if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+    }
+
+    if (mobileMenuToggle) {
+      mobileMenuToggle.addEventListener('click', () => {
+        if (sidebar) sidebar.classList.add('open');
+        if (sidebarOverlay) sidebarOverlay.classList.add('active');
+      });
+    }
+
+    if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+
     navItems.forEach(item => {
       item.addEventListener('click', () => {
         const view = item.getAttribute('data-view');
@@ -374,6 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (view) switchView(view);
         if (langFilter) filterByLang(langFilter);
         if (qualityFilter) filterByQuality(qualityFilter);
+
+        closeSidebar();
       });
     });
 
