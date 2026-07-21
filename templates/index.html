@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wuvos Music Player - Classic Glassy</title>
+
+  <!-- Google Fonts & Remix Icon Library -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css">
+  
+  <!-- Main Glassy Stylesheet -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Main Application Shell -->
+  <div class="app-container">
+
+    <!-- Glassy Sidebar Navigation -->
+    <aside class="sidebar glass-panel">
+      <div class="brand-header">
+        <div class="brand-logo">
+          <i class="ri-disc-line"></i>
+        </div>
+        <div class="brand-name">Wuvos</div>
+      </div>
+
+      <nav class="nav-section">
+        <div class="nav-section-title">Menu</div>
+        <ul class="nav-list">
+          <li class="nav-item active" data-view="home">
+            <i class="ri-home-5-line"></i>
+            <span>Home</span>
+          </li>
+          <li class="nav-item" data-view="search">
+            <i class="ri-search-2-line"></i>
+            <span>Search</span>
+          </li>
+          <li class="nav-item" data-view="library">
+            <i class="ri-stack-line"></i>
+            <span>Library</span>
+          </li>
+          <li class="nav-item" data-view="folders">
+            <i class="ri-folder-music-line"></i>
+            <span>Folders</span>
+          </li>
+        </ul>
+      </nav>
+
+      <nav class="nav-section">
+        <div class="nav-section-title">Categories</div>
+        <ul class="nav-list">
+          <li class="nav-item" data-filter-lang="English">
+            <i class="ri-global-line"></i>
+            <span>English</span>
+            <span class="badge" id="badge-english">0</span>
+          </li>
+          <li class="nav-item" data-filter-lang="Hindi">
+            <i class="ri-music-2-line"></i>
+            <span>Hindi</span>
+            <span class="badge" id="badge-hindi">0</span>
+          </li>
+          <li class="nav-item" data-filter-quality="flac">
+            <i class="ri-vip-diamond-line"></i>
+            <span>FLAC Audio</span>
+            <span class="badge" id="badge-flac">0</span>
+          </li>
+        </ul>
+      </nav>
+
+      <nav class="nav-section">
+        <div class="nav-section-title">My Collection</div>
+        <ul class="nav-list">
+          <li class="nav-item" data-view="favorites">
+            <i class="ri-heart-line"></i>
+            <span>Liked Songs</span>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Sidebar Footer / Theme Toggle -->
+      <div class="sidebar-footer">
+        <button class="theme-toggle-btn" id="theme-toggle">
+          <span id="theme-label"><i class="ri-moon-line"></i> Dark Theme</span>
+          <i class="ri-contrast-2-line"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main View Workspace -->
+    <main class="main-view">
+      
+      <!-- Top Bar Header -->
+      <header class="top-header glass-panel">
+        <div class="search-bar-container">
+          <i class="ri-search-line"></i>
+          <input type="text" id="global-search" class="search-input" placeholder="Search title, artist, language, FLAC...">
+        </div>
+
+        <div class="header-actions">
+          <button class="btn-glass" id="quick-rescan-btn">
+            <i class="ri-refresh-line"></i>
+            <span>Rescan Library</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Content Views -->
+      <div class="view-content" id="view-content">
+
+        <!-- HOME VIEW -->
+        <section id="view-home" class="view-pane active">
+          <!-- Glassy Hero Banner -->
+          <div class="hero-banner glass-panel">
+            <div class="hero-info">
+              <div class="hero-badge"><i class="ri-sparkling-fill"></i> Personal Music Player</div>
+              <h1 class="hero-title">Glassy Music Experience</h1>
+              <p class="hero-subtitle">High-fidelity audio streaming with dynamic equalizer visualization and Spotify-inspired controls.</p>
+              <div class="hero-controls">
+                <button class="btn-glass btn-accent" id="hero-play-all">
+                  <i class="ri-play-fill"></i> Play All Songs
+                </button>
+                <button class="btn-glass" id="hero-shuffle-all">
+                  <i class="ri-shuffle-line"></i> Shuffle
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Categories Section -->
+          <div>
+            <div class="section-title">
+              <span>Categories</span>
+            </div>
+            <div class="cards-grid" id="categories-grid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Songs Table Section -->
+          <div>
+            <div class="section-title">
+              <span>All Tracks</span>
+              <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);" id="total-songs-count">0 tracks</span>
+            </div>
+
+            <table class="songs-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">#</th>
+                  <th>Title</th>
+                  <th>Language</th>
+                  <th>Quality</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="songs-list-body">
+                <!-- Song rows rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEARCH VIEW -->
+        <section id="view-search" class="view-pane" style="display: none;">
+          <div class="section-title">Search Results</div>
+          <div class="cards-grid" id="search-grid"></div>
+        </section>
+
+        <!-- FOLDERS VIEW -->
+        <section id="view-folders" class="view-pane" style="display: none;">
+          <div class="section-title">Folder Structure</div>
+          <p style="color: var(--text-muted); margin-bottom: 18px;">Browse audio folders matching your songs/ directory (songs/Language/Quality)</p>
+          <div id="folder-tree-container"></div>
+        </section>
+
+        <!-- FAVORITES VIEW -->
+        <section id="view-favorites" class="view-pane" style="display: none;">
+          <div class="section-title"><i class="ri-heart-fill" style="color: #E63946;"></i> Liked Songs</div>
+          <div id="favorites-list-container"></div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Persistent Glassy Audio Player Bar -->
+  <footer class="player-bar">
+    <!-- Left: Track Details -->
+    <div class="player-left">
+      <div class="player-cover" id="player-cover">
+        <i class="ri-disc-fill"></i>
+      </div>
+      <div class="player-song-info">
+        <div class="player-song-title" id="player-title">Select a Song</div>
+        <div class="player-song-artist" id="player-artist">Personal Music Library</div>
+      </div>
+      <button class="btn-like" id="player-like-btn" title="Like Song">
+        <i class="ri-heart-line"></i>
+      </button>
+    </div>
+
+    <!-- Center: Controls & Seekbar -->
+    <div class="player-center">
+      <div class="controls-btns">
+        <button class="btn-ctrl" id="ctrl-shuffle" title="Shuffle"><i class="ri-shuffle-line"></i></button>
+        <button class="btn-ctrl" id="ctrl-prev" title="Previous"><i class="ri-skip-back-fill"></i></button>
+        <button class="btn-play-pause" id="ctrl-play-pause" title="Play/Pause"><i class="ri-play-fill"></i></button>
+        <button class="btn-ctrl" id="ctrl-next" title="Next"><i class="ri-skip-forward-fill"></i></button>
+        <button class="btn-ctrl" id="ctrl-repeat" title="Repeat"><i class="ri-repeat-2-line"></i></button>
+      </div>
+
+      <div class="progress-container">
+        <span class="time-text" id="time-current">0:00</span>
+        <div class="seek-bar-wrapper" id="seek-bar-container">
+          <div class="seek-bar-fill" id="seek-bar-fill"></div>
+        </div>
+        <span class="time-text right" id="time-total">0:00</span>
+      </div>
+    </div>
+
+    <!-- Right: Visualizer & Volume -->
+    <div class="player-right">
+      <canvas class="visualizer-canvas" id="audio-visualizer"></canvas>
+
+      <div class="volume-wrapper">
+        <button class="btn-ctrl" id="volume-icon" title="Mute/Unmute"><i class="ri-volume-up-fill"></i></button>
+        <div class="volume-bar-bg" id="volume-bar-container">
+          <div class="volume-bar-fill" id="volume-bar-fill"></div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- HTML5 Audio Element -->
+  <audio id="audio-engine" preload="auto"></audio>
+
+  <!-- JavaScript Modules -->
+  <script src="/static/js/visualizer.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
