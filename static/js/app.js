@@ -411,15 +411,29 @@ document.addEventListener('DOMContentLoaded', () => {
     ctrlShuffle.addEventListener('click', () => {
       state.isShuffle = !state.isShuffle;
       ctrlShuffle.classList.toggle('active', state.isShuffle);
+      ctrlShuffle.innerHTML = state.isShuffle 
+        ? '<i class="ri-shuffle-fill"></i>' 
+        : '<i class="ri-shuffle-line"></i>';
+      ctrlShuffle.setAttribute('title', `Shuffle: ${state.isShuffle ? 'ON' : 'OFF'}`);
     });
 
     ctrlRepeat.addEventListener('click', () => {
-      if (state.repeatMode === 'off') state.repeatMode = 'all';
-      else if (state.repeatMode === 'all') state.repeatMode = 'one';
-      else state.repeatMode = 'off';
-
-      ctrlRepeat.classList.toggle('active', state.repeatMode !== 'off');
-      ctrlRepeat.setAttribute('title', `Repeat: ${state.repeatMode.toUpperCase()}`);
+      ctrlRepeat.classList.remove('active', 'active-one');
+      if (state.repeatMode === 'off') {
+        state.repeatMode = 'all';
+        ctrlRepeat.classList.add('active');
+        ctrlRepeat.innerHTML = '<i class="ri-repeat-2-fill"></i>';
+        ctrlRepeat.setAttribute('title', 'Repeat: ALL SONGS');
+      } else if (state.repeatMode === 'all') {
+        state.repeatMode = 'one';
+        ctrlRepeat.classList.add('active', 'active-one');
+        ctrlRepeat.innerHTML = '<i class="ri-repeat-one-fill"></i>';
+        ctrlRepeat.setAttribute('title', 'Repeat: CURRENT SONG');
+      } else {
+        state.repeatMode = 'off';
+        ctrlRepeat.innerHTML = '<i class="ri-repeat-2-line"></i>';
+        ctrlRepeat.setAttribute('title', 'Repeat: OFF');
+      }
     });
 
     playerLikeBtn.addEventListener('click', () => {
