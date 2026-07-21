@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td style="color: var(--text-muted); font-weight:600;">${idx + 1}</td>
         <td>
           <div style="display:flex; align-items:center; gap:12px;">
-            <div style="width:36px; height:36px; border-radius:10px; background:${song.gradient}; display:flex; align-items:center; justify-content:center; color:#131217; font-size:16px;">
+            <div style="width:36px; height:36px; border-radius:10px; background:${song.gradient}; display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:16px;">
               <i class="${isCurrent && state.isPlaying ? 'ri-volume-up-fill' : 'ri-music-2-fill'}"></i>
             </div>
             <div>
@@ -267,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td style="width:40px;">${idx + 1}</td>
           <td>
             <div style="display:flex; align-items:center; gap:12px;">
-              <div style="width:36px; height:36px; border-radius:10px; background:${song.gradient}; display:flex; align-items:center; justify-content:center; color:#131217;">
+              <div style="width:36px; height:36px; border-radius:10px; background:${song.gradient}; display:flex; align-items:center; justify-content:center; color:#FFFFFF;">
                 <i class="ri-heart-fill" style="color:#E63946;"></i>
               </div>
               <div>

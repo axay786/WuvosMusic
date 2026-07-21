@@ -124,11 +124,11 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--c-periwinkle), var(--c-violet));
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-light));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #131217;
+  color: #FFFFFF;
   font-size: 22px;
   box-shadow: 0 4px 15px var(--accent-glow);
 }
@@ -136,7 +136,7 @@ body {
 .brand-name {
   font-size: 22px;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--c-periwinkle), #FFFFFF);
+  background: linear-gradient(135deg, var(--accent-light), #FFFFFF);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
@@ -323,8 +323,9 @@ body {
 }
 
 .btn-accent {
-  background: linear-gradient(135deg, var(--c-violet), var(--c-periwinkle));
-  color: #131217;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-light));
+  color: #FFFFFF;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   border: none;
   font-weight: 700;
 }
@@ -480,8 +481,8 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--c-periwinkle), var(--c-violet));
-  color: #131217;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-light));
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -611,11 +612,11 @@ body {
   height: 54px;
   min-width: 54px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--c-violet), var(--c-periwinkle));
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-light));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #131217;
+  color: #FFFFFF;
   font-size: 22px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.3);
   overflow: hidden;
@@ -704,7 +705,7 @@ body {
 }
 
 .btn-ctrl.active {
-  color: var(--c-periwinkle);
+  color: var(--accent-light);
   text-shadow: 0 0 10px var(--accent-glow);
 }
 
@@ -712,8 +713,8 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--c-periwinkle), var(--c-violet));
-  color: #131217;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-light));
+  color: #FFFFFF;
   border: none;
   font-size: 22px;
   display: flex;
