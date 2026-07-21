@@ -1,5 +1,10 @@
-# Ignore APK directory and all contents
-APK/
+# Ignore temporary Android build output, cache, and IDE files inside APK directory
+APK/.gradle/
+APK/.idea/
+APK/build/
+APK/app/build/
+APK/*.iml
+APK/app/*.iml
 
 # Python cache & bytecode
 __pycache__/
