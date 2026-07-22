@@ -14,3 +14,5 @@ __pycache__/
 # Local data & environment files
 playlists.json
 .env
+jdk-17/
+WuvosMusic.apk

@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Wuvos Music</string>
-    <string name="default_server_url">https://wuvos-music.onrender.com</string>
+    <string name="default_server_url">file:///android_asset/index.html</string>
 </resources>
