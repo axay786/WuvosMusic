@@ -68,6 +68,12 @@
   user-select: none;
 }
 
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   background: var(--bg-main);
   background-image: var(--bg-gradient);

@@ -559,12 +559,21 @@ document.addEventListener('DOMContentLoaded', () => {
       state.isPlaying = false;
       ctrlPlayPause.innerHTML = '<i class="ri-play-fill"></i>';
       playerCover.classList.remove('playing');
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+      syncNativeMediaState();
     } else {
       audio.play().then(() => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
         if (state.visualizer) state.visualizer.resume();
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'playing';
+          updateMediaSessionPosition();
+        }
+        syncNativeMediaState();
       });
     }
   }
@@ -610,6 +619,87 @@ document.addEventListener('DOMContentLoaded', () => {
     playSongByIndex(prevIdx);
   }
 
+  function getSongArtworkUrl(song) {
+    if (song.cover) return song.cover;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      const hashVal = (song.title || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const palette = GLASS_PALETTES[hashVal % GLASS_PALETTES.length];
+      
+      const grad = ctx.createLinearGradient(0, 0, 512, 512);
+      grad.addColorStop(0, palette ? palette[0] : '#471396');
+      grad.addColorStop(1, palette ? palette[1] : '#B13BFF');
+      
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+      
+      const circleGrad = ctx.createRadialGradient(256, 256, 20, 256, 256, 200);
+      circleGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+      circleGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = circleGrad;
+      ctx.beginPath();
+      ctx.arc(256, 256, 200, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 180px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('♪', 256, 240);
+      
+      return canvas.toDataURL('image/png');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function updateMediaSessionPosition() {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: audio.duration,
+            playbackRate: audio.playbackRate || 1,
+            position: audio.currentTime || 0
+          });
+        } catch (e) {}
+      }
+    }
+  }
+
+  function syncNativeMediaState() {
+    const song = state.currentIndex >= 0 ? state.queue[state.currentIndex] : null;
+    if (!song) return;
+
+    const title = song.title || 'Unknown Track';
+    const artist = song.artist || 'Unknown Artist';
+    const album = song.album || 'Wuvos';
+    const duration = audio.duration || 0;
+    const position = audio.currentTime || 0;
+    const isPlaying = state.isPlaying;
+    const coverBase64 = getSongArtworkUrl(song);
+
+    if (window.AndroidBridge && window.AndroidBridge.updateMediaState) {
+      window.AndroidBridge.updateMediaState(title, artist, album, duration, position, isPlaying, coverBase64);
+    }
+  }
+
+  // Global bindings for Android Native Lock Screen MediaSession controls
+  window.wuvosPlayNext = function() { playNextSong(); };
+  window.wuvosPlayPrev = function() { playPrevSong(); };
+  window.wuvosTogglePlay = function() { togglePlayPause(); };
+  window.wuvosSeekTo = function(seconds) {
+    if (audio) {
+      audio.currentTime = seconds;
+      updateMediaSessionPosition();
+      syncNativeMediaState();
+    }
+  };
+
   function updatePlayerUI(song) {
     playerTitle.textContent = song.title;
     playerArtist.textContent = `${song.artist} • ${song.quality_label}`;
@@ -624,12 +714,22 @@ document.addEventListener('DOMContentLoaded', () => {
     renderHomeView(state.songs);
 
     if ('mediaSession' in navigator) {
+      const artworkUrl = getSongArtworkUrl(song);
+      const artworkArray = artworkUrl ? [
+        { src: artworkUrl, sizes: '512x512', type: 'image/png' }
+      ] : [];
+
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: song.title,
-        artist: song.artist,
-        album: song.album
+        title: song.title || 'Unknown Track',
+        artist: song.artist || 'Unknown Artist',
+        album: song.album || 'Wuvos Music',
+        artwork: artworkArray
       });
+      navigator.mediaSession.playbackState = 'playing';
+      updateMediaSessionPosition();
     }
+
+    syncNativeMediaState();
   }
 
   // --- EVENT LISTENERS ---
@@ -711,12 +811,61 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (!state.isPlaying) togglePlayPause();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (state.isPlaying) togglePlayPause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          playPrevSong();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          playNextSong();
+        });
+        navigator.mediaSession.setActionHandler('stop', () => {
+          audio.pause();
+          state.isPlaying = false;
+          ctrlPlayPause.innerHTML = '<i class="ri-play-fill"></i>';
+          playerCover.classList.remove('playing');
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+          if (window.AndroidBridge && window.AndroidBridge.stopMediaService) {
+            window.AndroidBridge.stopMediaService();
+          }
+        });
+
+        if ('setPositionState' in navigator.mediaSession) {
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime !== undefined && audio.duration) {
+              audio.currentTime = details.seekTime;
+              updateMediaSessionPosition();
+            }
+          });
+          navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+            const skipTime = details.seekOffset || 10;
+            audio.currentTime = Math.max(audio.currentTime - skipTime, 0);
+            updateMediaSessionPosition();
+          });
+          navigator.mediaSession.setActionHandler('seekforward', (details) => {
+            const skipTime = details.seekOffset || 10;
+            audio.currentTime = Math.min(audio.currentTime + skipTime, audio.duration);
+            updateMediaSessionPosition();
+          });
+        }
+      } catch (e) {
+        console.warn('Error setting up MediaSession action handlers:', e);
+      }
+    }
+
     audio.addEventListener('timeupdate', () => {
       if (audio.duration) {
         const pct = (audio.currentTime / audio.duration) * 100;
         seekBarFill.style.width = `${pct}%`;
         timeCurrent.textContent = formatTime(audio.currentTime);
         timeTotal.textContent = formatTime(audio.duration);
+        updateMediaSessionPosition();
       }
     });
 
