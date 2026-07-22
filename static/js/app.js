@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let gitConfig = null;
 
   async function loadGitConfig() {
+    if (window.WUVOS_GIT_CONFIG) return window.WUVOS_GIT_CONFIG;
     if (gitConfig) return gitConfig;
     try {
       const res = await fetch('git_config.json');
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { owner, repo } = match;
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
 
-    const headers = { "User-Agent": "Wuvos-Glassy-Music-Player" };
+    const headers = {};
     if (token) {
       headers["Authorization"] = `token ${token}`;
     }
@@ -147,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             songs.push({
               id: songId,
+              sha: item.sha,
               title: titleFormatted,
               filename: filename,
               rel_path: path,
@@ -478,17 +480,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isLocalFileMode) {
       try {
         const config = await loadGitConfig();
-        if (config.token) {
-          const res = await fetch(song.raw_url, {
+        const match = reMatchGithub(config.repo_url);
+        if (config.token && match && song.sha) {
+          const { owner, repo } = match;
+          const blobUrl = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${song.sha}`;
+          const res = await fetch(blobUrl, {
             headers: {
-              'Authorization': 'token ' + config.token
+              'Authorization': 'token ' + config.token,
+              'Accept': 'application/vnd.github.v3.raw'
             }
           });
           if (res.ok) {
             const blob = await res.blob();
             playUrl = URL.createObjectURL(blob);
           } else {
-            console.error("Failed to fetch private stream:", res.statusText);
+            console.error("Failed to fetch private stream via API:", res.statusText);
           }
         }
       } catch (e) {

@@ -29,14 +29,7 @@ jobs:
 
       - name: Bundle Web Assets into APK Assets
         run: |
-          # Clean and create assets folder
-          rm -rf APK/app/src/main/assets
-          mkdir -p APK/app/src/main/assets
-          
-          # Copy files (explicitly excluding the APK folder itself)
-          cp templates/index.html APK/app/src/main/assets/index.html
-          cp -r static APK/app/src/main/assets/static
-          cp git_config.json APK/app/src/main/assets/git_config.json
+          python -c "import build_apk; build_apk.setup_assets()"
 
       - name: Build Debug APK
         run: |

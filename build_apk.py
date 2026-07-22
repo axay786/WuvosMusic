@@ -33,6 +33,23 @@ def setup_assets():
     src_config = "git_config.json"
     dest_config = os.path.join(APK_ASSETS_DIR, "git_config.json")
     shutil.copy(src_config, dest_config)
+
+    # Inline git_config.json content into the index.html for local APK mode
+    if os.path.exists(src_config):
+        print("Inlining git_config.json into index.html...")
+        with open(src_config, "r", encoding="utf-8") as f:
+            config_content = f.read()
+        
+        with open(dest_index, "r", encoding="utf-8") as f:
+            html_content = f.read()
+
+        script_injection = f"<script>window.WUVOS_GIT_CONFIG = {config_content};</script>"
+        # Insert script right before </head>
+        html_content = html_content.replace("</head>", f"{script_injection}\n</head>")
+
+        with open(dest_index, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
     print("Assets setup completed successfully (explicitly excluding the APK folder itself).")
 
 def download_jdk():
