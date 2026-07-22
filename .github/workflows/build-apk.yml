@@ -9,11 +9,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -54,14 +57,7 @@ jobs:
             echo "No changes in APK."
           else
             git commit -m "chore: update compiled WuvosMusic.apk [skip ci]"
-            # Extract personal access token from git_config.json
-            TOKEN=$(jq -r '.token' git_config.json)
-            if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
-              git push "https://x-access-token:${TOKEN}@github.com/axay786/WuvosMusic.git" HEAD:main
-            else
-              echo "No token found in git_config.json, attempting default push..."
-              git push origin HEAD:main
-            fi
+            git push origin main
           fi
 
       - name: Upload Debug APK Artifact

@@ -15,4 +15,6 @@ __pycache__/
 playlists.json
 .env
 jdk-17/
+android-sdk/
+test_sdk.py
 WuvosMusic.apk

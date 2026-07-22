@@ -9,6 +9,7 @@ import sys
 JDK_URL = "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/adoptium?project=jdk"
 JDK_ZIP = "jdk17.zip"
 JDK_DIR = "jdk-17"
+SDK_DIR = "android-sdk"
 APK_ASSETS_DIR = os.path.join("APK", "app", "src", "main", "assets")
 
 def setup_assets():
@@ -73,6 +74,38 @@ def download_jdk():
         os.remove(JDK_ZIP)
     print("JDK setup completed.")
 
+def setup_portable_sdk():
+    print("Setting up portable Android SDK folder...")
+    sdk_abs_path = os.path.abspath(SDK_DIR)
+    licenses_dir = os.path.join(sdk_abs_path, "licenses")
+    os.makedirs(licenses_dir, exist_ok=True)
+    
+    # Write accepted Android SDK licenses to enable auto-download of dependencies
+    licenses = {
+        "android-sdk-license": (
+            "8933bad161ad568b1181282f6e1d55e444001a4b\n"
+            "24333f8a63b6825ea9c5514f83c2829b004d1fee\n"
+            "d56f5187479451eabf01fb78af6df27872493d2b\n"
+            "84831b9409646a918e30573bab4c9c91346d8abd\n"
+            "504667f4c0de7af1a06de9f4b1727b84351f2910\n"
+        ),
+        "android-sdk-preview-license": "84831b9409646a918e30573bab4c9c91346d8abd\n",
+        "google-gdk-license": "33b6a2b64387b9850de48852bb352f02376adcca\n",
+        "android-googletv-license": "601085b94cd77f6b21c12942103cd0cd576b4554\n"
+    }
+    
+    for name, content in licenses.items():
+        with open(os.path.join(licenses_dir, name), "w", encoding="utf-8") as f:
+            f.write(content)
+            
+    # Write local.properties to point Gradle to this portable SDK directory
+    local_props = os.path.abspath(os.path.join("APK", "local.properties"))
+    sdk_path_formatted = sdk_abs_path.replace("\\", "/")
+    with open(local_props, "w", encoding="utf-8") as f:
+        f.write(f"sdk.dir={sdk_path_formatted}\n")
+        
+    print(f"local.properties configured to write to: {sdk_path_formatted}")
+
 def build_apk():
     print("Building Android APK...")
     # Find absolute path of JDK dir
@@ -90,7 +123,8 @@ def build_apk():
     print(f"Using JAVA_HOME={jdk_abs_path}")
     print("Running gradlew assembleDebug...")
     
-    proc = subprocess.run([gradlew, "assembleDebug"], cwd="APK", env=env)
+    # Run Gradle using the projects flag to point it to the APK directory correctly
+    proc = subprocess.run([gradlew, "-p", "APK", "assembleDebug"], env=env)
     if proc.returncode == 0:
         print("APK Build Successful!")
         # Copy output APK
@@ -111,6 +145,7 @@ if __name__ == "__main__":
     setup_assets()
     try:
         download_jdk()
+        setup_portable_sdk()
         build_apk()
     except Exception as e:
         print(f"An error occurred during build: {e}")
