@@ -112,12 +112,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const { owner, repo } = match;
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
 
-    const headers = {};
+    let response;
+    let headers = {};
     if (token) {
       headers["Authorization"] = `token ${token}`;
     }
 
-    const response = await fetch(apiUrl, { headers });
+    try {
+      response = await fetch(apiUrl, { headers });
+      if (!response.ok && token) {
+        console.warn("Fetch with token failed, retrying without token...");
+        response = await fetch(apiUrl, { headers: {} });
+      }
+    } catch (err) {
+      if (token) {
+        console.warn("Fetch with token threw error, retrying without token...", err);
+        response = await fetch(apiUrl, { headers: {} });
+      } else {
+        throw err;
+      }
+    }
+
     if (!response.ok) {
       throw new Error(`GitHub API error: ${response.statusText}`);
     }
@@ -481,20 +496,37 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const config = await loadGitConfig();
         const match = reMatchGithub(config.repo_url);
-        if (config.token && match && song.sha) {
+        if (match && song.sha) {
           const { owner, repo } = match;
           const blobUrl = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${song.sha}`;
-          const res = await fetch(blobUrl, {
-            headers: {
-              'Authorization': 'token ' + config.token,
-              'Accept': 'application/vnd.github.v3.raw'
+          
+          let res;
+          if (config.token) {
+            try {
+              res = await fetch(blobUrl, {
+                headers: {
+                  'Authorization': 'token ' + config.token,
+                  'Accept': 'application/vnd.github.v3.raw'
+                }
+              });
+            } catch (err) {
+              console.warn("Fetch with token threw error, retrying without token...");
             }
-          });
+          }
+          
+          if (!res || !res.ok) {
+            res = await fetch(blobUrl, {
+              headers: {
+                'Accept': 'application/vnd.github.v3.raw'
+              }
+            });
+          }
+
           if (res.ok) {
             const blob = await res.blob();
             playUrl = URL.createObjectURL(blob);
           } else {
-            console.error("Failed to fetch private stream via API:", res.statusText);
+            console.error("Failed to fetch stream via API:", res.statusText);
           }
         }
       } catch (e) {
