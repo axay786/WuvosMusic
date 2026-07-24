@@ -13,6 +13,7 @@ import android.graphics.BitmapFactory;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
@@ -37,6 +38,7 @@ public class MediaPlaybackService extends Service {
     private final IBinder binder = new LocalBinder();
     private MediaSessionCompat mediaSession;
     private NotificationManager notificationManager;
+    private PowerManager.WakeLock wakeLock;
 
     private String currentTitle = "Wuvos Music";
     private String currentArtist = "Playing Music";
@@ -58,6 +60,33 @@ public class MediaPlaybackService extends Service {
         notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel();
         initMediaSession();
+        initWakeLock();
+        startForegroundInternal();
+    }
+
+    private void initWakeLock() {
+        try {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null) {
+                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WuvosMusic::MediaPlaybackWakeLock");
+                wakeLock.setReferenceCounted(false);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void startForegroundInternal() {
+        try {
+            Notification notification = buildNotification();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void initMediaSession() {
@@ -99,6 +128,7 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        startForegroundInternal();
         if (intent != null && intent.getAction() != null) {
             String action = intent.getAction();
             if (ACTION_NEXT.equals(action)) {
@@ -123,6 +153,9 @@ public class MediaPlaybackService extends Service {
 
     public void stopSelfAndClearNotification() {
         try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
             stopForeground(true);
             if (notificationManager != null) {
                 notificationManager.cancel(NOTIFICATION_ID);
@@ -131,6 +164,10 @@ public class MediaPlaybackService extends Service {
                 mediaSession.setActive(false);
                 mediaSession.release();
                 mediaSession = null;
+            }
+            if (currentCover != null && !currentCover.isRecycled()) {
+                currentCover.recycle();
+                currentCover = null;
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -171,7 +208,13 @@ public class MediaPlaybackService extends Service {
             try {
                 String cleanBase64 = coverBase64.substring(coverBase64.indexOf(",") + 1);
                 byte[] decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT);
-                this.currentCover = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                Bitmap newBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                if (newBitmap != null) {
+                    if (this.currentCover != null && !this.currentCover.isRecycled()) {
+                        this.currentCover.recycle();
+                    }
+                    this.currentCover = newBitmap;
+                }
             } catch (Exception e) {
                 this.currentCover = null;
             }
@@ -210,17 +253,21 @@ public class MediaPlaybackService extends Service {
         Notification notification = buildNotification();
 
         if (isPlaying) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-            } else {
-                startForeground(NOTIFICATION_ID, notification);
+            startForegroundInternal();
+            if (wakeLock != null && !wakeLock.isHeld()) {
+                try {
+                    wakeLock.acquire(60 * 60 * 1000L); // Hold wakelock while playing
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         } else {
-            // When paused, detach foreground status so notification is dismissable / swipable by user
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_DETACH);
-            } else {
-                stopForeground(false);
+            if (wakeLock != null && wakeLock.isHeld()) {
+                try {
+                    wakeLock.release();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
             if (notificationManager != null) {
                 notificationManager.notify(NOTIFICATION_ID, notification);
@@ -296,13 +343,24 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public void onDestroy() {
-        if (mediaSession != null) {
-            mediaSession.setActive(false);
-            mediaSession.release();
-            mediaSession = null;
-        }
-        if (notificationManager != null) {
-            notificationManager.cancel(NOTIFICATION_ID);
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+            if (mediaSession != null) {
+                mediaSession.setActive(false);
+                mediaSession.release();
+                mediaSession = null;
+            }
+            if (notificationManager != null) {
+                notificationManager.cancel(NOTIFICATION_ID);
+            }
+            if (currentCover != null && !currentCover.isRecycled()) {
+                currentCover.recycle();
+                currentCover = null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         super.onDestroy();
     }
@@ -313,3 +371,4 @@ public class MediaPlaybackService extends Service {
         return binder;
     }
 }
+

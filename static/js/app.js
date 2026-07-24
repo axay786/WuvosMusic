@@ -483,69 +483,53 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- AUDIO CONTROLLER ---
+  const nextAudioPreloader = new Audio();
+  nextAudioPreloader.preload = 'auto';
+
+  function preloadNextSong() {
+    if (state.queue.length <= 1 || state.currentIndex === -1) return;
+    const nextIdx = (state.currentIndex + 1) % state.queue.length;
+    const nextSong = state.queue[nextIdx];
+    if (nextSong && (nextSong.stream_url || nextSong.raw_url)) {
+      nextAudioPreloader.src = nextSong.stream_url || nextSong.raw_url;
+      nextAudioPreloader.load();
+    }
+  }
+
   async function playSongByIndex(index) {
     if (index < 0 || index >= state.queue.length) return;
     state.currentIndex = index;
     const song = state.queue[index];
 
-    playerTitle.textContent = "Loading...";
+    // Update UI immediately for instantaneous feedback
+    updatePlayerUI(song);
 
-    let playUrl = song.stream_url;
+    let playUrl = song.stream_url || song.raw_url;
 
-    if (isLocalFileMode) {
-      try {
-        const config = await loadGitConfig();
-        const match = reMatchGithub(config.repo_url);
-        if (match && song.sha) {
-          const { owner, repo } = match;
-          const blobUrl = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${song.sha}`;
-          
-          let res;
-          if (config.token) {
-            try {
-              res = await fetch(blobUrl, {
-                headers: {
-                  'Authorization': 'token ' + config.token,
-                  'Accept': 'application/vnd.github.v3.raw'
-                }
-              });
-            } catch (err) {
-              console.warn("Fetch with token threw error, retrying without token...");
-            }
-          }
-          
-          if (!res || !res.ok) {
-            res = await fetch(blobUrl, {
-              headers: {
-                'Accept': 'application/vnd.github.v3.raw'
-              }
-            });
-          }
-
-          if (res.ok) {
-            const blob = await res.blob();
-            playUrl = URL.createObjectURL(blob);
-          } else {
-            console.error("Failed to fetch stream via API:", res.statusText);
-          }
-        }
-      } catch (e) {
-        console.error("Error setting up local playback stream:", e);
+    if (!playUrl && song.rel_path) {
+      const config = await loadGitConfig();
+      const match = reMatchGithub(config.repo_url);
+      if (match) {
+        const branch = config.branch || "main";
+        playUrl = `https://raw.githubusercontent.com/${match.owner}/${match.repo}/${branch}/${encodeURIComponent(song.rel_path)}`;
       }
     }
 
-    audio.src = playUrl;
-    audio.play().then(() => {
-      state.isPlaying = true;
-      updatePlayerUI(song);
-      if (state.visualizer) {
-        state.visualizer.init();
-        state.visualizer.resume();
-      }
-    }).catch(err => {
-      console.error('Audio play error:', err);
-      playerTitle.textContent = "Playback Error";
-    });
+    if (playUrl) {
+      audio.src = playUrl;
+      audio.play().then(() => {
+        state.isPlaying = true;
+        ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
+        playerCover.classList.add('playing');
+        if (state.visualizer) {
+          state.visualizer.init();
+          state.visualizer.resume();
+        }
+        preloadNextSong();
+      }).catch(err => {
+        console.error('Audio play error:', err);
+      });
+    }
   }
 
   function togglePlayPause() {
@@ -620,7 +604,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getSongArtworkUrl(song) {
+    if (!song) return '';
     if (song.cover) return song.cover;
+    if (song._artworkUrl) return song._artworkUrl;
     try {
       const canvas = document.createElement('canvas');
       canvas.width = 512;
@@ -651,7 +637,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.textBaseline = 'middle';
       ctx.fillText('♪', 256, 240);
       
-      return canvas.toDataURL('image/png');
+      const url = canvas.toDataURL('image/png');
+      song._artworkUrl = url;
+      return url;
     } catch (e) {
       return '';
     }
@@ -875,6 +863,15 @@ document.addEventListener('DOMContentLoaded', () => {
         audio.play();
       } else {
         playNextSong();
+      }
+    });
+
+    audio.addEventListener('error', (e) => {
+      console.warn('Audio element error encountered:', e, audio.error);
+      if (state.isPlaying) {
+        setTimeout(() => {
+          playNextSong();
+        }, 1500);
       }
     });
 
