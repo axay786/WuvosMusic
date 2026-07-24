@@ -89,52 +89,53 @@ class GitSyncManager:
             headers["Authorization"] = f"token {token}"
 
         try:
-            req = urllib.request.Request(api_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                tree = data.get("tree", [])
-                
-                downloaded_count = 0
-                synced_rel_paths = set()
+            resp = self._fetch_url(api_url, headers)
+            data = json.loads(resp.read().decode('utf-8'))
+            resp.close()
+            tree = data.get("tree", [])
+            
+            downloaded_count = 0
+            synced_rel_paths = set()
 
-                for item in tree:
-                    path = item.get("path", "")
-                    if item.get("type") == "blob":
-                        ext = os.path.splitext(path)[1].lower()
-                        if ext in ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac']:
-                            synced_rel_paths.add(os.path.normpath(path).lower())
-                            
-                            quoted_path = urllib.parse.quote(path)
-                            raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{quoted_path}"
-                            
-                            dest_path = os.path.join(self.base_dir, path)
-                            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                            
-                            req_raw = urllib.request.Request(raw_url, headers=headers)
-                            with urllib.request.urlopen(req_raw, timeout=30) as r_raw, open(dest_path, "wb") as f_out:
-                                f_out.write(r_raw.read())
-                            
-                            downloaded_count += 1
+            for item in tree:
+                path = item.get("path", "")
+                if item.get("type") == "blob":
+                    ext = os.path.splitext(path)[1].lower()
+                    if ext in ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac']:
+                        synced_rel_paths.add(os.path.normpath(path).lower())
+                        
+                        quoted_path = urllib.parse.quote(path)
+                        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{quoted_path}"
+                        
+                        dest_path = os.path.join(self.base_dir, path)
+                        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                        
+                        r_raw = self._fetch_url(raw_url, headers)
+                        with open(dest_path, "wb") as f_out:
+                            f_out.write(r_raw.read())
+                        r_raw.close()
+                        
+                        downloaded_count += 1
 
-                # Clean up local files in songs/ that are no longer present in Git repo
-                for root, _, files in os.walk(self.base_dir):
-                    for f in files:
-                        ext = os.path.splitext(f)[1].lower()
-                        if ext in ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac']:
-                            full_p = os.path.join(root, f)
-                            rel_p = os.path.relpath(full_p, self.base_dir)
-                            if os.path.normpath(rel_p).lower() not in synced_rel_paths:
-                                try:
-                                    os.remove(full_p)
-                                except Exception:
-                                    pass
+            # Clean up local files in songs/ that are no longer present in Git repo
+            for root, _, files in os.walk(self.base_dir):
+                for f in files:
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac']:
+                        full_p = os.path.join(root, f)
+                        rel_p = os.path.relpath(full_p, self.base_dir)
+                        if os.path.normpath(rel_p).lower() not in synced_rel_paths:
+                            try:
+                                os.remove(full_p)
+                            except Exception:
+                                pass
 
-                return {
-                    "success": True,
-                    "message": f"Successfully synced {downloaded_count} songs from Git repository ({owner}/{repo})!",
-                    "synced_count": downloaded_count,
-                    "logs": logs
-                }
+            return {
+                "success": True,
+                "message": f"Successfully synced {downloaded_count} songs from Git repository ({owner}/{repo})!",
+                "synced_count": downloaded_count,
+                "logs": logs
+            }
         except Exception as e:
             logs.append(f"HTTP Sync Error: {str(e)}")
             return {
@@ -142,6 +143,17 @@ class GitSyncManager:
                 "message": f"Failed to sync repository: {str(e)}",
                 "logs": logs
             }
+
+    def _fetch_url(self, url, headers):
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            return urllib.request.urlopen(req, timeout=30)
+        except urllib.error.HTTPError as e:
+            if e.code in [401, 403] and "Authorization" in headers:
+                clean_headers = {k: v for k, v in headers.items() if k != "Authorization"}
+                req_clean = urllib.request.Request(url, headers=clean_headers)
+                return urllib.request.urlopen(req_clean, timeout=30)
+            raise e
 
 def re_match_github(url):
     m = re.search(r"github\.com/([^/]+)/([^/.]+)", url)
