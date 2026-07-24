@@ -226,38 +226,57 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAutoSyncing = false;
 
   async function performBackgroundAutoSync() {
-    if (isAutoSyncing || !isLocalFileMode) return;
+    if (isAutoSyncing) return;
     isAutoSyncing = true;
-    try {
-      const freshSongs = await syncSongsFromGithubClientSide();
-      if (freshSongs && freshSongs.length > 0) {
-        const localSongs = freshSongs;
-        state.songs = [...localSongs];
-        if (state.currentIndex === -1) {
-          state.queue = [...state.songs];
+
+    if (isLocalFileMode) {
+      // APK / Client-side mode
+      try {
+        const freshSongs = await syncSongsFromGithubClientSide();
+        if (freshSongs && freshSongs.length > 0) {
+          const localSongs = freshSongs;
+          state.songs = [...localSongs];
+          if (state.currentIndex === -1) {
+            state.queue = [...state.songs];
+          }
+          updateBadges(localSongs);
+          renderHomeView(state.songs);
+          renderSearchGrid(state.songs);
         }
-        updateBadges(localSongs);
-        renderHomeView(state.songs);
-        renderSearchGrid(state.songs);
+      } catch (e) {
+        console.warn("Background auto-sync deferred:", e);
+        const currentStored = JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
+        if (currentStored.length === 0) {
+          setTimeout(() => {
+            isAutoSyncing = false;
+            performBackgroundAutoSync();
+          }, 4000);
+          return;
+        }
       }
-    } catch (e) {
-      console.warn("Background auto-sync deferred:", e);
-      const currentStored = JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
-      if (currentStored.length === 0) {
-        setTimeout(() => {
-          isAutoSyncing = false;
-          performBackgroundAutoSync();
-        }, 4000);
-        return;
+    } else {
+      // Website / Server mode (Flask backend)
+      try {
+        const res = await fetch('/api/git/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.songs) {
+          state.songs = data.songs;
+          if (state.currentIndex === -1) {
+            state.queue = [...state.songs];
+          }
+          updateBadges(state.songs);
+          renderHomeView(state.songs);
+          renderSearchGrid(state.songs);
+        }
+      } catch (e) {
+        console.warn("Server background auto-sync deferred:", e);
       }
     }
     isAutoSyncing = false;
   }
 
   window.addEventListener('online', () => {
-    if (isLocalFileMode) {
-      performBackgroundAutoSync();
-    }
+    performBackgroundAutoSync();
   });
 
   async function fetchSongs(params = {}) {
@@ -300,10 +319,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (data.success) {
         state.songs = data.songs;
-        state.queue = [...state.songs];
+        if (state.currentIndex === -1) {
+          state.queue = [...state.songs];
+        }
         updateBadges(state.songs);
         renderHomeView(state.songs);
         renderSearchGrid(state.songs);
+
+        if (!params.lang && !params.quality && !params.q) {
+          performBackgroundAutoSync();
+        }
       }
     } catch (e) {
       console.error('Failed to load songs:', e);
