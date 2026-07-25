@@ -22,7 +22,19 @@ class AudioVisualizer {
       this.source = this.audioCtx.createMediaElementSource(this.audio);
       this.source.connect(this.analyser);
       this.analyser.connect(this.audioCtx.destination);
-      
+
+      // Mobile browsers auto-suspend the AudioContext when the tab is
+      // backgrounded to save power. Since the <audio> element's output is
+      // routed entirely through this context, a suspended context means
+      // total silence even though the element itself reports "playing".
+      // Auto-resume the instant the browser suspends it while a track
+      // should be audible.
+      this.audioCtx.onstatechange = () => {
+        if (this.audioCtx.state === 'suspended' && !this.audio.paused) {
+          this.audioCtx.resume().catch(() => {});
+        }
+      };
+
       this.isInitialized = true;
       this.draw();
     } catch (e) {
