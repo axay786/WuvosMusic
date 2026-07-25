@@ -6,7 +6,7 @@ import urllib.request
 import urllib.parse
 
 CONFIG_FILE = "git_config.json"
-AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus'}
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus', '.mp4', '.m4v', '.webm', '.mka', '.3gp'}
 
 
 class GitSyncManager:

@@ -110,8 +110,15 @@ def stream_audio(song_path):
         '.flac': 'audio/flac',
         '.wav': 'audio/wav',
         '.m4a': 'audio/mp4',
+        '.mp4': 'video/mp4',
+        '.m4v': 'video/mp4',
+        '.webm': 'audio/webm',
+        '.mka': 'audio/x-matroska',
+        '.3gp': 'audio/3gpp',
         '.ogg': 'audio/ogg',
-        '.aac': 'audio/aac'
+        '.aac': 'audio/aac',
+        '.wma': 'audio/x-ms-wma',
+        '.opus': 'audio/opus'
     }
     content_type = mime_types.get(ext, 'application/octet-stream')
 

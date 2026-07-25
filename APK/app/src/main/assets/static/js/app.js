@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = await response.json();
     const tree = data.tree || [];
     const songs = [];
-    const audioExtensions = ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus'];
+    const audioExtensions = ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus', '.mp4', '.m4v', '.webm', '.mka', '.3gp'];
 
     tree.forEach(item => {
       if (item.type === "blob") {

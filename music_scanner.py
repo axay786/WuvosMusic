@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 
 # Supported audio extensions
-AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus'}
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus', '.mp4', '.m4v', '.webm', '.mka', '.3gp'}
 
 # Curated dynamic album cover gradients matching user palette
 GLASS_PALETTES = [
