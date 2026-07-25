@@ -256,21 +256,24 @@ document.addEventListener('DOMContentLoaded', () => {
           renderHomeView(state.songs);
           renderSearchGrid(state.songs);
         }
-      } else {
-        // Website / Server mode (Flask backend)
-        const res = await fetch('/api/git/sync', { method: 'POST' });
-        const data = await res.json();
-        if (data.success && data.songs) {
-          state.allSongs = data.songs;
-          state.songs = data.songs;
-          if (state.currentIndex === -1) {
-            state.queue = [...state.songs];
+        } else {
+          // Website / Server mode (Flask backend)
+          const res = await fetch('/api/git/sync', { method: 'POST' });
+          if (!res.ok) {
+            throw new Error(`Server returned HTTP ${res.status}`);
           }
-          updateBadges(state.songs);
-          renderHomeView(state.songs);
-          renderSearchGrid(state.songs);
+          const data = await res.json();
+          if (data.success && data.songs) {
+            state.allSongs = data.songs;
+            state.songs = data.songs;
+            if (state.currentIndex === -1) {
+              state.queue = [...state.songs];
+            }
+            updateBadges(state.songs);
+            renderHomeView(state.songs);
+            renderSearchGrid(state.songs);
+          }
         }
-      }
 
       if (rescanBtn) {
         rescanBtn.innerHTML = '<i class="ri-checkbox-circle-fill" style="color:#4EAA25;"></i> <span>Synced!</span>';
@@ -1099,6 +1102,9 @@ document.addEventListener('DOMContentLoaded', () => {
           renderSearchGrid(state.songs);
         } else {
           const res = await fetch('/api/git/sync', { method: 'POST' });
+          if (!res.ok) {
+            throw new Error(`Server returned HTTP ${res.status}`);
+          }
           const data = await res.json();
           if (data.success) {
             state.songs = data.songs || [];

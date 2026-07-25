@@ -43,9 +43,17 @@ def save_playlists(playlists):
 def index():
     return render_template("index.html")
 
+def get_all_combined_songs():
+    local_songs = scanner.scan()
+    remote_songs = git_manager.get_cached_remote_songs()
+    song_map = {s["rel_path"].lower(): s for s in remote_songs}
+    for ls in local_songs:
+        song_map[ls["rel_path"].lower()] = ls
+    return list(song_map.values())
+
 @app.route("/api/songs", methods=["GET"])
 def get_songs():
-    songs = scanner.scan()
+    songs = get_all_combined_songs()
     
     # Query parameters
     lang = request.args.get("lang")
@@ -71,6 +79,15 @@ def get_songs():
 @app.route("/api/folders", methods=["GET"])
 def get_folders():
     tree = scanner.get_folder_tree()
+    songs = get_all_combined_songs()
+    for s in songs:
+        parts = s["rel_path"].split('/')
+        folder = '/'.join(parts[:-1]) if len(parts) > 1 else "root"
+        if folder not in tree:
+            tree[folder] = {"dirs": [], "files": [], "count": 0}
+        if s["filename"] not in tree[folder]["files"]:
+            tree[folder]["files"].append(s["filename"])
+            tree[folder]["count"] += 1
     return jsonify({"success": True, "tree": tree})
 
 @app.route("/api/playlists", methods=["GET", "POST"])
@@ -86,9 +103,9 @@ def manage_playlists():
 @app.route("/api/git/sync", methods=["POST", "GET"])
 def trigger_git_sync():
     res = git_manager.sync()
-    songs = scanner.scan()
-    res["song_count"] = len(songs)
-    res["songs"] = songs
+    all_songs = get_all_combined_songs()
+    res["song_count"] = len(all_songs)
+    res["songs"] = all_songs
     return jsonify(res)
 
 @app.route("/api/stream/<path:song_path>")

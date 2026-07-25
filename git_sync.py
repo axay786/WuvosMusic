@@ -5,8 +5,23 @@ import subprocess
 import urllib.request
 import urllib.parse
 
+import hashlib
+
 CONFIG_FILE = "git_config.json"
 AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus', '.mp4', '.m4v', '.webm', '.mka', '.3gp'}
+
+GLASS_PALETTES = [
+    ["#471396", "#B13BFF"],
+    ["#B13BFF", "#FFCC00"],
+    ["#090040", "#471396"],
+    ["#4C3BCF", "#3DC2EC"],
+    ["#4B70F5", "#B13BFF"]
+]
+
+def get_gradient_for_title(title):
+    hash_val = sum(ord(c) for c in title)
+    palette = GLASS_PALETTES[hash_val % len(GLASS_PALETTES)]
+    return f"linear-gradient(135deg, {palette[0]} 0%, {palette[1]} 100%)"
 
 
 class GitSyncManager:
@@ -96,46 +111,66 @@ class GitSyncManager:
             resp.close()
             tree = data.get("tree", [])
             
-            downloaded_count = 0
-            synced_rel_paths = set()
-
+            remote_songs = []
             for item in tree:
                 path = item.get("path", "")
                 if item.get("type") == "blob":
                     ext = os.path.splitext(path)[1].lower()
                     if ext in AUDIO_EXTENSIONS:
-                        synced_rel_paths.add(os.path.normpath(path).lower())
-                        
                         quoted_path = urllib.parse.quote(path)
                         raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{quoted_path}"
                         
-                        dest_path = os.path.join(self.base_dir, path)
-                        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                        parts = path.split('/')
+                        lang_raw = parts[0] if len(parts) > 1 else "Uncategorized"
+                        language = lang_raw.title()
+                        quality_raw = parts[1] if len(parts) > 2 else "normal"
+                        is_lossless = quality_raw.lower() in ['flac', 'flack', 'lossless', 'hd'] or ext == '.flac'
+                        quality_label = "24-BIT FLAC" if is_lossless else "HQ Audio"
+                        filename = parts[-1]
+                        clean_name = os.path.splitext(filename)[0]
+                        title_formatted = clean_name.replace('_', ' ').replace('-', ' ').strip().title()
+                        folder_path = '/'.join(parts[:-1]) if len(parts) > 1 else "Root"
                         
-                        r_raw = self._fetch_url(raw_url, headers)
-                        with open(dest_path, "wb") as f_out:
-                            f_out.write(r_raw.read())
-                        r_raw.close()
-                        
-                        downloaded_count += 1
+                        file_size = item.get("size", 1024 * 1024)
+                        est_duration = max(15, int(file_size / 32000))
+                        song_id = hashlib.md5(path.encode('utf-8')).hexdigest()[:12]
 
-            # Clean up local files in songs/ that are no longer present in Git repo
-            for root, _, files in os.walk(self.base_dir):
-                for f in files:
-                    ext = os.path.splitext(f)[1].lower()
-                    if ext in AUDIO_EXTENSIONS:
-                        full_p = os.path.join(root, f)
-                        rel_p = os.path.relpath(full_p, self.base_dir)
-                        if os.path.normpath(rel_p).lower() not in synced_rel_paths:
-                            try:
-                                os.remove(full_p)
-                            except Exception:
-                                pass
+                        song_item = {
+                            "id": song_id,
+                            "sha": item.get("sha", ""),
+                            "title": title_formatted,
+                            "filename": filename,
+                            "rel_path": path,
+                            "folder": folder_path,
+                            "language": language,
+                            "quality_raw": quality_raw.lower(),
+                            "quality_label": quality_label,
+                            "is_lossless": is_lossless,
+                            "artist": f"{language} Collection",
+                            "album": f"{folder_path} - {quality_raw.upper()}" if folder_path != "Root" else f"{language} - {quality_raw.upper()}",
+                            "duration": est_duration,
+                            "format": ext[1:].upper(),
+                            "file_size": file_size,
+                            "gradient": get_gradient_for_title(title_formatted),
+                            "stream_url": raw_url,
+                            "raw_url": raw_url
+                        }
+                        remote_songs.append(song_item)
+
+            # Cache remote songs list to disk
+            cache_file = os.path.join(self.base_dir, "remote_cache.json")
+            try:
+                os.makedirs(self.base_dir, exist_ok=True)
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    json.dump(remote_songs, f, indent=2)
+            except Exception as ce:
+                logs.append(f"Cache write notice: {ce}")
 
             return {
                 "success": True,
-                "message": f"Successfully synced {downloaded_count} songs from Git repository ({owner}/{repo})!",
-                "synced_count": downloaded_count,
+                "message": f"Successfully synced {len(remote_songs)} songs from Git repository ({owner}/{repo})!",
+                "synced_count": len(remote_songs),
+                "remote_songs": remote_songs,
                 "logs": logs
             }
         except Exception as e:
@@ -145,6 +180,16 @@ class GitSyncManager:
                 "message": f"Failed to sync repository: {str(e)}",
                 "logs": logs
             }
+
+    def get_cached_remote_songs(self):
+        cache_file = os.path.join(self.base_dir, "remote_cache.json")
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return []
 
     def _fetch_url(self, url, headers):
         req = urllib.request.Request(url, headers=headers)
