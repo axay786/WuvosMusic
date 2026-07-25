@@ -103,7 +103,10 @@ class GitSyncManager:
         api_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
         headers = {"User-Agent": "Wuvos-Glassy-Music-Player"}
         if token:
-            headers["Authorization"] = f"token {token}"
+            if token.startswith("ghp_") or token.startswith("github_pat_"):
+                headers["Authorization"] = f"Bearer {token}"
+            else:
+                headers["Authorization"] = f"token {token}"
 
         try:
             resp = self._fetch_url(api_url, headers)
@@ -174,10 +177,22 @@ class GitSyncManager:
                 "logs": logs
             }
         except Exception as e:
-            logs.append(f"HTTP Sync Error: {str(e)}")
+            err_msg = str(e)
+            logs.append(f"HTTP Sync Error: {err_msg}")
+            cached_songs = self.get_cached_remote_songs()
+            if cached_songs and ("403" in err_msg or "rate limit" in err_msg.lower()):
+                return {
+                    "success": True,
+                    "message": f"GitHub API rate limit reached (60 req/hr). Displaying {len(cached_songs)} cached songs.",
+                    "synced_count": len(cached_songs),
+                    "remote_songs": cached_songs,
+                    "rate_limited": True,
+                    "logs": logs
+                }
             return {
                 "success": False,
-                "message": f"Failed to sync repository: {str(e)}",
+                "message": f"GitHub API Sync Notice: {err_msg}. Add a free GitHub token in git_config.json to increase rate limits.",
+                "rate_limited": "403" in err_msg or "rate limit" in err_msg.lower(),
                 "logs": logs
             }
 

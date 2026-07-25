@@ -128,14 +128,19 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       if (token) {
         console.warn("Fetch with token threw error, retrying without token...", err);
-        response = await fetch(apiUrl, { headers: {} });
+        try {
+          response = await fetch(apiUrl, { headers: {} });
+        } catch (e2) {
+          return JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
+        }
       } else {
-        throw err;
+        return JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
       }
     }
 
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.statusText}`);
+    if (!response || !response.ok) {
+      console.warn(`GitHub API Notice (${response ? response.status : 'Error'}). Returning stored library cache.`);
+      return JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
     }
 
     const data = await response.json();
