@@ -117,7 +117,7 @@ class GitSyncManager:
                 if item.get("type") == "blob":
                     ext = os.path.splitext(path)[1].lower()
                     if ext in AUDIO_EXTENSIONS:
-                        quoted_path = urllib.parse.quote(path)
+                        quoted_path = urllib.parse.quote(path, safe='/')
                         raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{quoted_path}"
                         
                         parts = path.split('/')

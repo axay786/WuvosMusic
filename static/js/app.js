@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAutoSyncing = false;
 
   async function performBackgroundAutoSync() {
-    if (isAutoSyncing) return;
+    if (isAutoSyncing || state.isPlaying) return;
     isAutoSyncing = true;
 
     const rescanBtn = document.getElementById('quick-rescan-btn');
@@ -650,6 +650,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  let wakeLockObj = null;
+
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        if (!wakeLockObj || wakeLockObj.released) {
+          wakeLockObj = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {}
+    }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLockObj) {
+      try { wakeLockObj.release(); } catch (err) {}
+      wakeLockObj = null;
+    }
+  }
+
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && state.isPlaying) {
+      requestWakeLock();
+    }
+  });
+
+  function sanitizeAudioUrl(url, relPath) {
+    let target = url || '';
+    if (!target && relPath) {
+      target = `/api/stream/${relPath}`;
+    }
+    if (!target) return '';
+    try {
+      if (target.startsWith('http://') || target.startsWith('https://')) {
+        const u = new URL(target);
+        const parts = u.pathname.split('/').map(p => encodeURIComponent(decodeURIComponent(p)));
+        return u.origin + parts.join('/') + u.search;
+      } else {
+        const parts = target.split('/').map(p => encodeURIComponent(decodeURIComponent(p)));
+        return parts.join('/');
+      }
+    } catch (e) {
+      return target;
+    }
+  }
+
   async function playSongByIndex(index) {
     if (index < 0 || index >= state.queue.length) return;
     state.currentIndex = index;
@@ -658,7 +703,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update UI immediately for instantaneous feedback
     updatePlayerUI(song);
 
-    let playUrl = song.stream_url || song.raw_url;
+    let rawPlayUrl = song.stream_url || song.raw_url;
+    let playUrl = sanitizeAudioUrl(rawPlayUrl, song.rel_path);
 
     if (!playUrl && song.rel_path) {
       const config = await loadGitConfig();
@@ -676,13 +722,14 @@ document.addEventListener('DOMContentLoaded', () => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
+        requestWakeLock();
         if (state.visualizer) {
           state.visualizer.init();
           state.visualizer.resume();
         }
         preloadNextSong();
       }).catch(err => {
-        console.error('Audio play error:', err);
+        console.error('Audio play error:', err, playUrl);
       });
     }
   }
@@ -698,6 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.isPlaying = false;
       ctrlPlayPause.innerHTML = '<i class="ri-play-fill"></i>';
       playerCover.classList.remove('playing');
+      releaseWakeLock();
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
       }
@@ -707,6 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
+        requestWakeLock();
         if (state.visualizer) state.visualizer.resume();
         if ('mediaSession' in navigator) {
           navigator.mediaSession.playbackState = 'playing';

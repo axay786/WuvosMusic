@@ -1,9 +1,10 @@
 import os
 import re
 import json
-from flask import Flask, render_template, jsonify, request, send_file, Response
+import urllib.parse
+from flask import Flask, render_template, jsonify, request, send_file, Response, redirect
 from music_scanner import MusicScanner
-from git_sync import GitSyncManager
+from git_sync import GitSyncManager, re_match_github
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -116,6 +117,14 @@ def stream_audio(song_path):
     """
     full_path = os.path.join(scanner.base_dir, song_path)
     if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        repo_url = git_manager.config.get("repo_url", "")
+        match = re_match_github(repo_url)
+        if match:
+            owner, repo = match
+            branch = git_manager.config.get("branch", "main")
+            quoted_p = urllib.parse.quote(song_path, safe='/')
+            raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{quoted_p}"
+            return redirect(raw_url, code=302)
         return jsonify({"error": "File not found"}), 404
 
     file_size = os.path.getsize(full_path)
