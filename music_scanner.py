@@ -67,17 +67,19 @@ class MusicScanner:
 
                     song_id = self.generate_song_id(rel_path)
                     
+                    folder_path = '/'.join(path_parts[:-1]) if len(path_parts) > 1 else "Root"
                     song_item = {
                         "id": song_id,
                         "title": title_formatted,
                         "filename": file,
                         "rel_path": rel_path,
+                        "folder": folder_path,
                         "language": language,
                         "quality_raw": quality_raw.lower(),
                         "quality_label": quality_label,
                         "is_lossless": is_lossless,
                         "artist": f"{language} Collection",
-                        "album": f"{language} - {quality_raw.upper()}",
+                        "album": f"{folder_path} - {quality_raw.upper()}" if folder_path != "Root" else f"{language} - {quality_raw.upper()}",
                         "duration": est_duration,
                         "format": ext[1:].upper(),
                         "file_size": file_size,

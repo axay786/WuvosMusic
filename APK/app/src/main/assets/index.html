@@ -25,7 +25,7 @@
   "branch": "main",
   "token": "",
   "auto_sync_on_start": true,
-  "notes": "Add your personal Git repository URL, branch, and access token (if private) here. The music player will read settings from this file."
+  "notes": "Add your personal Git repository URL, branch, and access token (if private) here. The music player automatically detects and scans all folders and audio files from the repository."
 }
 ;</script>
 </head>
@@ -70,17 +70,7 @@
 
       <nav class="nav-section">
         <div class="nav-section-title">Categories</div>
-        <ul class="nav-list">
-          <li class="nav-item" data-filter-lang="English">
-            <i class="ri-global-line"></i>
-            <span>English</span>
-            <span class="badge" id="badge-english">0</span>
-          </li>
-          <li class="nav-item" data-filter-lang="Hindi">
-            <i class="ri-music-2-line"></i>
-            <span>Hindi</span>
-            <span class="badge" id="badge-hindi">0</span>
-          </li>
+        <ul class="nav-list" id="sidebar-categories-list">
           <li class="nav-item" data-filter-quality="flac">
             <i class="ri-vip-diamond-line"></i>
             <span>FLAC Audio</span>

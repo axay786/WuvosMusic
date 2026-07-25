@@ -49,11 +49,14 @@ def get_songs():
     
     # Query parameters
     lang = request.args.get("lang")
+    folder = request.args.get("folder")
     quality = request.args.get("quality")
     query = request.args.get("q")
 
     if lang:
-        songs = [s for s in songs if s["language"].lower() == lang.lower()]
+        songs = [s for s in songs if s["language"].lower() == lang.lower() or s.get("folder", "").lower().startswith(lang.lower())]
+    if folder:
+        songs = [s for s in songs if s.get("folder", "").lower().startswith(folder.lower()) or s["language"].lower() == folder.lower()]
     if quality:
         if quality.lower() == "flac":
             songs = [s for s in songs if s["is_lossless"]]
@@ -61,7 +64,7 @@ def get_songs():
             songs = [s for s in songs if not s["is_lossless"]]
     if query:
         q = query.lower()
-        songs = [s for s in songs if q in s["title"].lower() or q in s["artist"].lower() or q in s["rel_path"].lower()]
+        songs = [s for s in songs if q in s["title"].lower() or q in s["artist"].lower() or q in s["rel_path"].lower() or q in s["language"].lower()]
 
     return jsonify({"success": True, "count": len(songs), "songs": songs})
 

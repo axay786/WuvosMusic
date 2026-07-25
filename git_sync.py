@@ -6,6 +6,8 @@ import urllib.request
 import urllib.parse
 
 CONFIG_FILE = "git_config.json"
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac', '.wma', '.opus'}
+
 
 class GitSyncManager:
     def __init__(self, base_dir="songs"):
@@ -101,7 +103,7 @@ class GitSyncManager:
                 path = item.get("path", "")
                 if item.get("type") == "blob":
                     ext = os.path.splitext(path)[1].lower()
-                    if ext in ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac']:
+                    if ext in AUDIO_EXTENSIONS:
                         synced_rel_paths.add(os.path.normpath(path).lower())
                         
                         quoted_path = urllib.parse.quote(path)
@@ -121,7 +123,7 @@ class GitSyncManager:
             for root, _, files in os.walk(self.base_dir):
                 for f in files:
                     ext = os.path.splitext(f)[1].lower()
-                    if ext in ['.mp3', '.flac', '.wav', '.m4a', '.ogg', '.aac']:
+                    if ext in AUDIO_EXTENSIONS:
                         full_p = os.path.join(root, f)
                         rel_p = os.path.relpath(full_p, self.base_dir)
                         if os.path.normpath(rel_p).lower() not in synced_rel_paths:

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Global Application State
   const state = {
+    allSongs: [],
     songs: [],
     queue: [],
     currentIndex: -1,
@@ -150,16 +151,18 @@ document.addEventListener('DOMContentLoaded', () => {
           const ext = path.slice(dotIdx).toLowerCase();
           if (audioExtensions.includes(ext)) {
             const parts = path.split('/');
-            const langRaw = parts[0] || "Uncategorized";
+            const langRaw = parts.length > 1 ? parts[0] : "Uncategorized";
             const language = langRaw.charAt(0).toUpperCase() + langRaw.slice(1);
-            const qualityRaw = parts[1] || "normal";
+            const qualityRaw = parts.length > 2 ? parts[1] : "normal";
             const isLossless = qualityRaw.toLowerCase() === 'flac' || ext === '.flac';
             const qualityLabel = isLossless ? "24-BIT FLAC" : "HQ Audio";
             const filename = parts[parts.length - 1];
             const cleanName = filename.slice(0, filename.lastIndexOf('.'));
             const titleFormatted = cleanName.replace(/_/g, ' ').replace(/-/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
             const songId = generateSongId(path);
-            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURIComponent(path)}`;
+            const quotedPath = path.split('/').map(encodeURIComponent).join('/');
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${quotedPath}`;
+            const folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : "Root";
 
             songs.push({
               id: songId,
@@ -167,12 +170,13 @@ document.addEventListener('DOMContentLoaded', () => {
               title: titleFormatted,
               filename: filename,
               rel_path: path,
+              folder: folderPath,
               language: language,
               quality_raw: qualityRaw.toLowerCase(),
               quality_label: qualityLabel,
               is_lossless: isLossless,
               artist: `${language} Collection`,
-              album: `${language} - ${qualityRaw.toUpperCase()}`,
+              album: folderPath !== "Root" ? `${folderPath} - ${qualityRaw.toUpperCase()}` : `${language} - ${qualityRaw.toUpperCase()}`,
               duration: Math.max(15, Math.floor(item.size / 32000)),
               format: ext.slice(1).toUpperCase(),
               file_size: item.size,
@@ -193,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme(state.theme);
   initVisualizer();
   fetchSongs();
+  performBackgroundAutoSync();
   setupEventListeners();
 
   // Theme Switcher
@@ -229,12 +234,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isAutoSyncing) return;
     isAutoSyncing = true;
 
-    if (isLocalFileMode) {
-      // APK / Client-side mode
-      try {
+    const rescanBtn = document.getElementById('quick-rescan-btn');
+    let originalHtml = '';
+    if (rescanBtn) {
+      originalHtml = rescanBtn.innerHTML;
+      rescanBtn.innerHTML = '<i class="ri-refresh-line ri-spin" style="color:var(--c-periwinkle);"></i> <span>Syncing Git...</span>';
+    }
+
+    try {
+      if (isLocalFileMode) {
+        // APK / Client-side mode
         const freshSongs = await syncSongsFromGithubClientSide();
         if (freshSongs && freshSongs.length > 0) {
           const localSongs = freshSongs;
+          state.allSongs = [...localSongs];
           state.songs = [...localSongs];
           if (state.currentIndex === -1) {
             state.queue = [...state.songs];
@@ -243,23 +256,12 @@ document.addEventListener('DOMContentLoaded', () => {
           renderHomeView(state.songs);
           renderSearchGrid(state.songs);
         }
-      } catch (e) {
-        console.warn("Background auto-sync deferred:", e);
-        const currentStored = JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
-        if (currentStored.length === 0) {
-          setTimeout(() => {
-            isAutoSyncing = false;
-            performBackgroundAutoSync();
-          }, 4000);
-          return;
-        }
-      }
-    } else {
-      // Website / Server mode (Flask backend)
-      try {
+      } else {
+        // Website / Server mode (Flask backend)
         const res = await fetch('/api/git/sync', { method: 'POST' });
         const data = await res.json();
         if (data.success && data.songs) {
+          state.allSongs = data.songs;
           state.songs = data.songs;
           if (state.currentIndex === -1) {
             state.queue = [...state.songs];
@@ -268,8 +270,28 @@ document.addEventListener('DOMContentLoaded', () => {
           renderHomeView(state.songs);
           renderSearchGrid(state.songs);
         }
-      } catch (e) {
-        console.warn("Server background auto-sync deferred:", e);
+      }
+
+      if (rescanBtn) {
+        rescanBtn.innerHTML = '<i class="ri-checkbox-circle-fill" style="color:#4EAA25;"></i> <span>Synced!</span>';
+        setTimeout(() => {
+          if (rescanBtn) {
+            rescanBtn.innerHTML = '<i class="ri-refresh-line"></i> <span>Rescan Library</span>';
+          }
+        }, 2000);
+      }
+    } catch (e) {
+      console.warn("Background auto-sync deferred:", e);
+      if (rescanBtn) {
+        rescanBtn.innerHTML = '<i class="ri-refresh-line"></i> <span>Rescan Library</span>';
+      }
+      const currentStored = JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
+      if (currentStored.length === 0 && isLocalFileMode) {
+        setTimeout(() => {
+          isAutoSyncing = false;
+          performBackgroundAutoSync();
+        }, 5000);
+        return;
       }
     }
     isAutoSyncing = false;
@@ -279,13 +301,19 @@ document.addEventListener('DOMContentLoaded', () => {
     performBackgroundAutoSync();
   });
 
+  // Periodic background auto-sync every 60 seconds
+  setInterval(() => {
+    performBackgroundAutoSync();
+  }, 60000);
+
   async function fetchSongs(params = {}) {
     if (isLocalFileMode) {
       let localSongs = JSON.parse(localStorage.getItem('wuvos_synced_songs') || '[]');
+      state.allSongs = localSongs;
       
       let filtered = [...localSongs];
       if (params.lang) {
-        filtered = filtered.filter(s => s.language.toLowerCase() === params.lang.toLowerCase());
+        filtered = filtered.filter(s => (s.language || '').toLowerCase() === params.lang.toLowerCase() || (s.folder || '').toLowerCase().includes(params.lang.toLowerCase()));
       }
       if (params.quality) {
         if (params.quality.toLowerCase() === 'flac') {
@@ -296,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (params.q) {
         const q = params.q.toLowerCase();
-        filtered = filtered.filter(s => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q) || s.rel_path.toLowerCase().includes(q));
+        filtered = filtered.filter(s => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q) || s.rel_path.toLowerCase().includes(q) || (s.language || '').toLowerCase().includes(q));
       }
 
       state.songs = filtered;
@@ -318,11 +346,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/songs?${queryStr}`);
       const data = await res.json();
       if (data.success) {
+        if (!state.allSongs || state.allSongs.length === 0 || (!params.lang && !params.quality && !params.q)) {
+          state.allSongs = data.songs;
+        }
         state.songs = data.songs;
         if (state.currentIndex === -1) {
           state.queue = [...state.songs];
         }
-        updateBadges(state.songs);
+        updateBadges(state.allSongs.length > 0 ? state.allSongs : state.songs);
         renderHomeView(state.songs);
         renderSearchGrid(state.songs);
 
@@ -335,52 +366,111 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function updateBadges(songs) {
-    const englishCount = songs.filter(s => (s.language || '').toLowerCase() === 'english').length;
-    const hindiCount = songs.filter(s => (s.language || '').toLowerCase() === 'hindi').length;
-    const flacCount = songs.filter(s => s.is_lossless).length;
+  function getCategoriesFromSongs(songs) {
+    const categoriesMap = {};
+    (songs || []).forEach(s => {
+      const lang = s.language || "Uncategorized";
+      categoriesMap[lang] = (categoriesMap[lang] || 0) + 1;
+    });
+    return categoriesMap;
+  }
 
-    document.getElementById('badge-english').textContent = englishCount;
-    document.getElementById('badge-hindi').textContent = hindiCount;
-    document.getElementById('badge-flac').textContent = flacCount;
-    document.getElementById('total-songs-count').textContent = `${songs.length} tracks`;
+  function updateBadges(songs) {
+    const fullSongs = (state.allSongs && state.allSongs.length > 0) ? state.allSongs : songs;
+    const flacCount = fullSongs.filter(s => s.is_lossless).length;
+
+    const badgeFlac = document.getElementById('badge-flac');
+    if (badgeFlac) badgeFlac.textContent = flacCount;
+
+    const totalBadge = document.getElementById('total-songs-count');
+    if (totalBadge) totalBadge.textContent = `${songs.length} tracks`;
+
+    const sidebarCatList = document.getElementById('sidebar-categories-list');
+    if (sidebarCatList) {
+      const categoriesMap = getCategoriesFromSongs(fullSongs);
+      let catHtml = `
+        <li class="nav-item" data-filter-quality="flac">
+          <i class="ri-vip-diamond-line"></i>
+          <span>FLAC Audio</span>
+          <span class="badge" id="badge-flac">${flacCount}</span>
+        </li>
+      `;
+
+      const icons = ['ri-global-line', 'ri-music-2-line', 'ri-folder-music-line', 'ri-disc-line', 'ri-headphone-line', 'ri-radio-line'];
+      let iconIdx = 0;
+
+      for (const [catName, count] of Object.entries(categoriesMap)) {
+        const icon = icons[iconIdx % icons.length];
+        iconIdx++;
+        catHtml += `
+          <li class="nav-item" data-filter-lang="${escapeHtml(catName)}">
+            <i class="${icon}"></i>
+            <span>${escapeHtml(catName)}</span>
+            <span class="badge">${count}</span>
+          </li>
+        `;
+      }
+      sidebarCatList.innerHTML = catHtml;
+
+      sidebarCatList.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const langFilter = item.getAttribute('data-filter-lang');
+          const qualityFilter = item.getAttribute('data-filter-quality');
+
+          document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+          item.classList.add('active');
+
+          if (langFilter) filterByLang(langFilter);
+          if (qualityFilter) filterByQuality(qualityFilter);
+
+          const sidebar = document.querySelector('.sidebar');
+          const sidebarOverlay = document.getElementById('sidebar-overlay');
+          if (sidebar) sidebar.classList.remove('open');
+          if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+        });
+      });
+    }
   }
 
   // --- RENDERING VIEWS ---
   function renderHomeView(songs) {
-    // Render Category Cards with Remix Icons
     const catGrid = document.getElementById('categories-grid');
-    catGrid.innerHTML = `
-      <div class="music-card" onclick="filterByLang('English')">
-        <div class="card-cover" style="background: linear-gradient(135deg, #471396, #B13BFF);">
-          <i class="ri-global-line"></i>
-          <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
-        </div>
-        <div class="card-title">English Hits</div>
-        <div class="card-artist">Songs Collection</div>
-        <span class="quality-badge flac">FLAC & HQ</span>
-      </div>
+    if (catGrid) {
+      const fullSongs = (state.allSongs && state.allSongs.length > 0) ? state.allSongs : songs;
+      const categoriesMap = getCategoriesFromSongs(fullSongs);
 
-      <div class="music-card" onclick="filterByLang('Hindi')">
-        <div class="card-cover" style="background: linear-gradient(135deg, #B13BFF, #FFCC00);">
-          <i class="ri-music-2-line"></i>
-          <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
-        </div>
-        <div class="card-title">Hindi Collection</div>
-        <div class="card-artist">Songs Collection</div>
-        <span class="quality-badge flac">FLAC & HQ</span>
-      </div>
+      let cardsHtml = ``;
+      let cardIdx = 0;
+      for (const [catName, count] of Object.entries(categoriesMap)) {
+        const gradient = GLASS_PALETTES[cardIdx % GLASS_PALETTES.length];
+        cardIdx++;
+        cardsHtml += `
+          <div class="music-card" onclick="filterByLang('${escapeHtml(catName)}')">
+            <div class="card-cover" style="background: linear-gradient(135deg, ${gradient[0]}, ${gradient[1]});">
+              <i class="ri-folder-music-line"></i>
+              <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
+            </div>
+            <div class="card-title">${escapeHtml(catName)}</div>
+            <div class="card-artist">${count} ${count === 1 ? 'Track' : 'Tracks'}</div>
+            <span class="quality-badge flac">Folder</span>
+          </div>
+        `;
+      }
 
-      <div class="music-card" onclick="filterByQuality('flac')">
-        <div class="card-cover" style="background: linear-gradient(135deg, #4C3BCF, #3DC2EC);">
-          <i class="ri-vip-diamond-line"></i>
-          <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
+      cardsHtml += `
+        <div class="music-card" onclick="filterByQuality('flac')">
+          <div class="card-cover" style="background: linear-gradient(135deg, #4C3BCF, #3DC2EC);">
+            <i class="ri-vip-diamond-line"></i>
+            <div class="play-hover-btn"><i class="ri-play-fill"></i></div>
+          </div>
+          <div class="card-title">Lossless FLACs</div>
+          <div class="card-artist">High Resolution</div>
+          <span class="quality-badge flac">24-BIT FLAC</span>
         </div>
-        <div class="card-title">Lossless FLACs</div>
-        <div class="card-artist">High Resolution</div>
-        <span class="quality-badge flac">24-BIT FLAC</span>
-      </div>
-    `;
+      `;
+
+      catGrid.innerHTML = cardsHtml;
+    }
 
     // Render Songs Table
     const tbody = document.getElementById('songs-list-body');
@@ -572,7 +662,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const match = reMatchGithub(config.repo_url);
       if (match) {
         const branch = config.branch || "main";
-        playUrl = `https://raw.githubusercontent.com/${match.owner}/${match.repo}/${branch}/${encodeURIComponent(song.rel_path)}`;
+        const quotedRelPath = song.rel_path.split('/').map(encodeURIComponent).join('/');
+        playUrl = `https://raw.githubusercontent.com/${match.owner}/${match.repo}/${branch}/${quotedRelPath}`;
       }
     }
 
