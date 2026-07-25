@@ -109,12 +109,67 @@ def trigger_git_sync():
     res["songs"] = all_songs
     return jsonify(res)
 
+def proxy_remote_stream(raw_url, content_type):
+    range_header = request.headers.get('Range', None)
+    req_headers = {"User-Agent": "Mozilla/5.0 (Wuvos-Music-Player)"}
+    if range_header:
+        req_headers['Range'] = range_header
+
+    try:
+        req = urllib.request.Request(raw_url, headers=req_headers)
+        r = urllib.request.urlopen(req, timeout=15)
+        
+        status_code = r.getcode()
+        response_headers = {
+            'Content-Type': content_type,
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*'
+        }
+        
+        for key in ['Content-Length', 'Content-Range']:
+            val = r.headers.get(key)
+            if val:
+                response_headers[key] = val
+
+        def generate():
+            try:
+                chunk_size = 64 * 1024
+                while True:
+                    chunk = r.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                r.close()
+
+        return Response(generate(), status=status_code, headers=response_headers, mimetype=content_type)
+    except Exception:
+        return redirect(raw_url, code=302)
+
 @app.route("/api/stream/<path:song_path>")
 def stream_audio(song_path):
     """
     Audio streaming endpoint with HTTP Range header (206 Partial Content) support
-    for instant seeking and scrubbing.
+    and correct audio/* MIME types so browser <audio> elements output sound.
     """
+    ext = os.path.splitext(song_path)[1].lower()
+    mime_types = {
+        '.mp3': 'audio/mpeg',
+        '.flac': 'audio/flac',
+        '.wav': 'audio/wav',
+        '.m4a': 'audio/mp4',
+        '.mp4': 'audio/mp4',
+        '.m4v': 'audio/mp4',
+        '.webm': 'audio/webm',
+        '.mka': 'audio/x-matroska',
+        '.3gp': 'audio/3gpp',
+        '.ogg': 'audio/ogg',
+        '.aac': 'audio/aac',
+        '.wma': 'audio/x-ms-wma',
+        '.opus': 'audio/opus'
+    }
+    content_type = mime_types.get(ext, 'audio/mp4')
+
     full_path = os.path.join(scanner.base_dir, song_path)
     if not os.path.exists(full_path) or not os.path.isfile(full_path):
         repo_url = git_manager.config.get("repo_url", "")
@@ -124,29 +179,11 @@ def stream_audio(song_path):
             branch = git_manager.config.get("branch", "main")
             quoted_p = urllib.parse.quote(song_path, safe='/')
             raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{quoted_p}"
-            return redirect(raw_url, code=302)
+            return proxy_remote_stream(raw_url, content_type)
         return jsonify({"error": "File not found"}), 404
 
     file_size = os.path.getsize(full_path)
     range_header = request.headers.get('Range', None)
-    
-    ext = os.path.splitext(full_path)[1].lower()
-    mime_types = {
-        '.mp3': 'audio/mpeg',
-        '.flac': 'audio/flac',
-        '.wav': 'audio/wav',
-        '.m4a': 'audio/mp4',
-        '.mp4': 'video/mp4',
-        '.m4v': 'video/mp4',
-        '.webm': 'audio/webm',
-        '.mka': 'audio/x-matroska',
-        '.3gp': 'audio/3gpp',
-        '.ogg': 'audio/ogg',
-        '.aac': 'audio/aac',
-        '.wma': 'audio/x-ms-wma',
-        '.opus': 'audio/opus'
-    }
-    content_type = mime_types.get(ext, 'application/octet-stream')
 
     if not range_header:
         return send_file(full_path, mimetype=content_type)

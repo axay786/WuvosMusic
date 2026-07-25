@@ -155,7 +155,7 @@ class GitSyncManager:
                             "format": ext[1:].upper(),
                             "file_size": file_size,
                             "gradient": get_gradient_for_title(title_formatted),
-                            "stream_url": raw_url,
+                            "stream_url": f"/api/stream/{quoted_path}",
                             "raw_url": raw_url
                         }
                         remote_songs.append(song_item)
