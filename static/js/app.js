@@ -1056,6 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    let lastNativeSyncTime = 0;
     audio.addEventListener('timeupdate', () => {
       if (audio.duration) {
         const pct = (audio.currentTime / audio.duration) * 100;
@@ -1063,6 +1064,12 @@ document.addEventListener('DOMContentLoaded', () => {
         timeCurrent.textContent = formatTime(audio.currentTime);
         timeTotal.textContent = formatTime(audio.duration);
         updateMediaSessionPosition();
+
+        const now = Date.now();
+        if (now - lastNativeSyncTime > 5000) {
+          lastNativeSyncTime = now;
+          syncNativeMediaState();
+        }
       }
     });
 

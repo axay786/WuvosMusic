@@ -13,6 +13,7 @@ import android.graphics.BitmapFactory;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
+import android.net.wifi.WifiManager;
 import android.os.PowerManager;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
@@ -39,6 +40,7 @@ public class MediaPlaybackService extends Service {
     private MediaSessionCompat mediaSession;
     private NotificationManager notificationManager;
     private PowerManager.WakeLock wakeLock;
+    private WifiManager.WifiLock wifiLock;
 
     private String currentTitle = "Wuvos Music";
     private String currentArtist = "Playing Music";
@@ -70,6 +72,14 @@ public class MediaPlaybackService extends Service {
             if (powerManager != null) {
                 wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WuvosMusic::MediaPlaybackWakeLock");
                 wakeLock.setReferenceCounted(false);
+            }
+            Context appCtx = getApplicationContext();
+            if (appCtx != null) {
+                WifiManager wifiManager = (WifiManager) appCtx.getSystemService(Context.WIFI_SERVICE);
+                if (wifiManager != null) {
+                    wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "WuvosMusic::WifiLock");
+                    wifiLock.setReferenceCounted(false);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -256,7 +266,14 @@ public class MediaPlaybackService extends Service {
             startForegroundInternal();
             if (wakeLock != null && !wakeLock.isHeld()) {
                 try {
-                    wakeLock.acquire(60 * 60 * 1000L); // Hold wakelock while playing
+                    wakeLock.acquire(24 * 60 * 60 * 1000L); // Hold 24h wakelock while playing
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if (wifiLock != null && !wifiLock.isHeld()) {
+                try {
+                    wifiLock.acquire();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -265,6 +282,13 @@ public class MediaPlaybackService extends Service {
             if (wakeLock != null && wakeLock.isHeld()) {
                 try {
                     wakeLock.release();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if (wifiLock != null && wifiLock.isHeld()) {
+                try {
+                    wifiLock.release();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
