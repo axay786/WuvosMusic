@@ -12,7 +12,7 @@ git_manager = GitSyncManager(base_dir="songs")
 
 # Auto-sync on startup if enabled in git_config.json
 try:
-    if git_manager.config.get("auto_sync_on_start", True):
+    if git_manager.config.get("auto_sync_on_start", False):
         print("Auto-syncing music from Git repository...")
         git_manager.sync()
 except Exception as e:
