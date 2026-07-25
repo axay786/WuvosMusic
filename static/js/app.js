@@ -309,9 +309,14 @@ document.addEventListener('DOMContentLoaded', () => {
     performBackgroundAutoSync();
   });
 
-  // Periodic background auto-sync every 60 seconds
+  // Periodic background auto-sync every 60 seconds (skip while the tab is
+  // hidden and idle - no point burning battery/data syncing a screen
+  // nobody's looking at; it'll catch up as soon as the tab is visible again
+  // via the visibilitychange-driven flows elsewhere).
   setInterval(() => {
-    performBackgroundAutoSync();
+    if (!document.hidden) {
+      performBackgroundAutoSync();
+    }
   }, 60000);
 
   async function fetchSongs(params = {}) {
@@ -1138,15 +1143,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    let searchDebounceTimer = null;
     globalSearch.addEventListener('input', (e) => {
       const query = e.target.value.trim();
-      if (query) {
-        switchView('search');
-        fetchSongs({ q: query });
-      } else {
-        switchView('home');
-        fetchSongs();
-      }
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        if (query) {
+          switchView('search');
+          fetchSongs({ q: query });
+        } else {
+          switchView('home');
+          fetchSongs();
+        }
+      }, 300);
     });
 
     document.getElementById('hero-play-all').addEventListener('click', () => {
