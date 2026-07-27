@@ -205,24 +205,136 @@ document.addEventListener('DOMContentLoaded', () => {
   performBackgroundAutoSync();
   setupEventListeners();
 
-  // Theme Switcher
-  function initTheme(theme) {
-    if (theme !== 'ocean') theme = 'default';
-
-    document.documentElement.setAttribute('data-theme', theme);
-    state.theme = theme;
-    localStorage.setItem('wuvos_theme', theme);
-
-    if (theme === 'default') {
-      themeLabel.innerHTML = '<i class="ri-sparkling-fill" style="color:#FFCC00;"></i> Neon Gold';
-    } else {
-      themeLabel.innerHTML = '<i class="ri-drop-fill" style="color:#3DC2EC;"></i> Ocean Cyan';
+  // Theme Manager with 8 Custom Color Palettes
+  const THEMES = [
+    {
+      id: 'default',
+      name: 'Neon Gold',
+      icon: 'ri-sparkling-fill',
+      primaryColor: '#FFCC00',
+      colors: ['#090040', '#1F0A5C', '#471396', '#B13BFF', '#FFCC00']
+    },
+    {
+      id: 'ocean',
+      name: 'Ocean Cyan',
+      icon: 'ri-drop-fill',
+      primaryColor: '#3DC2EC',
+      colors: ['#1A1140', '#20174A', '#4C3BCF', '#4B70F5', '#3DC2EC']
+    },
+    {
+      id: 'teal',
+      name: 'Teal Lagoon',
+      icon: 'ri-water-flash-line',
+      primaryColor: '#8FCFE1',
+      colors: ['#085A6B', '#17A2B4', '#3AB2C3', '#5ABDCC', '#8FCFE1']
+    },
+    {
+      id: 'amber',
+      name: 'Velvet Amber',
+      icon: 'ri-vip-crown-2-line',
+      primaryColor: '#B08D57',
+      colors: ['#0B0B0D', '#1F2933', '#6B7280', '#B08D57', '#E6E1D8']
+    },
+    {
+      id: 'cyber',
+      name: 'Neon Cyberpunk',
+      icon: 'ri-flashlight-line',
+      primaryColor: '#22D3EE',
+      colors: ['#0F172A', '#7C3AED', '#F472B6', '#22D3EE', '#F8FAFC']
+    },
+    {
+      id: 'pastel',
+      name: 'Pastel Dream',
+      icon: 'ri-cloudy-2-line',
+      primaryColor: '#DDD6FE',
+      colors: ['#1F2937', '#DDD6FE', '#FCE7F3', '#BAE6FD', '#C7F9CC']
+    },
+    {
+      id: 'sunset',
+      name: 'Sunset Flare',
+      icon: 'ri-sun-cloudy-line',
+      primaryColor: '#FF4D8D',
+      colors: ['#7C3AED', '#FF4D8D', '#FFB3C7', '#FDE047', '#FFF7ED']
+    },
+    {
+      id: 'lime',
+      name: 'Lime Matrix',
+      icon: 'ri-terminal-box-line',
+      primaryColor: '#84CC16',
+      colors: ['#0A0A0A', '#3F3F46', '#A3A3A3', '#84CC16', '#F5F5F5']
     }
+  ];
+
+  function initTheme(themeId) {
+    let activeThemeObj = THEMES.find(t => t.id === themeId);
+    if (!activeThemeObj) {
+      themeId = 'default';
+      activeThemeObj = THEMES[0];
+    }
+
+    document.documentElement.setAttribute('data-theme', themeId);
+    state.theme = themeId;
+    localStorage.setItem('wuvos_theme', themeId);
+
+    if (themeLabel) {
+      themeLabel.innerHTML = `<i class="${activeThemeObj.icon}" style="color:${activeThemeObj.primaryColor};"></i> ${activeThemeObj.name}`;
+    }
+
+    if (state.visualizer) {
+      state.visualizer._gradientCache = null;
+    }
+
+    renderThemeGrid();
   }
 
   function toggleTheme() {
-    const nextTheme = state.theme === 'default' ? 'ocean' : 'default';
-    initTheme(nextTheme);
+    const currentIndex = THEMES.findIndex(t => t.id === state.theme);
+    const nextIndex = (currentIndex + 1) % THEMES.length;
+    initTheme(THEMES[nextIndex].id);
+  }
+
+  function openThemeModal() {
+    const modalOverlay = document.getElementById('theme-modal-overlay');
+    if (modalOverlay) {
+      renderThemeGrid();
+      modalOverlay.classList.add('active');
+    }
+  }
+
+  function closeThemeModal() {
+    const modalOverlay = document.getElementById('theme-modal-overlay');
+    if (modalOverlay) {
+      modalOverlay.classList.remove('active');
+    }
+  }
+
+  function renderThemeGrid() {
+    const grid = document.getElementById('theme-grid');
+    if (!grid) return;
+
+    grid.innerHTML = THEMES.map(theme => {
+      const isActive = state.theme === theme.id;
+      const swatchesHtml = theme.colors.map(c => `<div class="swatch-color" style="background:${c};"></div>`).join('');
+      return `
+        <div class="theme-card ${isActive ? 'active' : ''}" data-theme-id="${theme.id}">
+          <div class="theme-card-header">
+            <span><i class="${theme.icon}" style="color:${theme.primaryColor};"></i> ${theme.name}</span>
+            ${isActive ? `<i class="ri-checkbox-circle-fill" style="color:${theme.primaryColor}; font-size: 1.2rem;"></i>` : ''}
+          </div>
+          <div class="theme-swatches">
+            ${swatchesHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('.theme-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const themeId = card.getAttribute('data-theme-id');
+        initTheme(themeId);
+        closeThemeModal();
+      });
+    });
   }
 
   function initVisualizer() {
@@ -990,7 +1102,17 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    themeToggleBtn.addEventListener('click', toggleTheme);
+    themeToggleBtn.addEventListener('click', openThemeModal);
+    
+    const themeModalClose = document.getElementById('theme-modal-close');
+    const themeModalOverlay = document.getElementById('theme-modal-overlay');
+    if (themeModalClose) themeModalClose.addEventListener('click', closeThemeModal);
+    if (themeModalOverlay) {
+      themeModalOverlay.addEventListener('click', (e) => {
+        if (e.target === themeModalOverlay) closeThemeModal();
+      });
+    }
+
     ctrlPlayPause.addEventListener('click', togglePlayPause);
     ctrlNext.addEventListener('click', playNextSong);
     ctrlPrev.addEventListener('click', playPrevSong);

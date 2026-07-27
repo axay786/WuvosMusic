@@ -86,13 +86,14 @@ class AudioVisualizer {
 
     this.ctx.clearRect(0, 0, width, height);
 
-    // Gradient only depends on canvas height, not the per-bar loop, so
-    // rebuild it only when height actually changes instead of 32x/frame.
+    // Gradient depends on canvas height and current theme colors
     if (!this._gradientCache || this._gradientHeight !== height) {
+      const style = getComputedStyle(document.documentElement);
+      const primary = style.getPropertyValue('--accent-primary').trim() || '#9893DA';
+      const light = style.getPropertyValue('--accent-light').trim() || '#BBBDF6';
       this._gradientCache = this.ctx.createLinearGradient(0, height, 0, 0);
-      this._gradientCache.addColorStop(0, '#797A9E');
-      this._gradientCache.addColorStop(0.5, '#9893DA');
-      this._gradientCache.addColorStop(1, '#BBBDF6');
+      this._gradientCache.addColorStop(0, primary);
+      this._gradientCache.addColorStop(1, light);
       this._gradientHeight = height;
     }
     this.ctx.fillStyle = this._gradientCache;
