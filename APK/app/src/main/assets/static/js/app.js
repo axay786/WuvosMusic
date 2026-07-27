@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isShuffle: false,
     repeatMode: 'off', // 'off', 'all', 'one'
     likedIds: JSON.parse(localStorage.getItem('wuvos_liked_songs') || '[]'),
-    theme: localStorage.getItem('wuvos_theme') || 'dark',
+    theme: localStorage.getItem('wuvos_theme') || 'default',
     visualizer: null
   };
 
@@ -198,13 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return songs;
   }
 
-  // --- INITIALIZATION ---
-  initTheme(state.theme);
-  initVisualizer();
-  fetchSongs();
-  performBackgroundAutoSync();
-  setupEventListeners();
-
   // Theme Manager with 8 Custom Color Palettes
   const THEMES = [
     {
@@ -286,6 +279,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderThemeGrid();
   }
+
+  // --- INITIALIZATION ---
+  initTheme(state.theme);
+  initVisualizer();
+  fetchSongs();
+  performBackgroundAutoSync();
+  setupEventListeners();
 
   function toggleTheme() {
     const currentIndex = THEMES.findIndex(t => t.id === state.theme);
