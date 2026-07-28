@@ -256,8 +256,10 @@
   <audio id="audio-engine-a" preload="auto"></audio>
   <audio id="audio-engine-b" preload="auto"></audio>
   <audio id="audio-engine" preload="auto"></audio>
-  <!-- Silent Background Audio Keep-Alive for Samsung/Android Lock Screen -->
+  <!-- Silent Background Audio & Video Keep-Alive for Samsung/Android Lock Screen -->
   <audio id="audio-keep-alive" loop preload="auto" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+  <video id="video-keep-alive" playsinline loop muted style="display:none; width:1px; height:1px;"></video>
+  <canvas id="canvas-keep-alive" width="1" height="1" style="display:none;"></canvas>
 
   <script>
     if ('serviceWorker' in navigator) {

@@ -857,7 +857,113 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- SAMSUNG / ANDROID BACKGROUND AUDIO KEEP-ALIVE ---
   const audioKeepAlive = document.getElementById('audio-keep-alive');
+  const videoKeepAlive = document.getElementById('video-keep-alive');
+  const canvasKeepAlive = document.getElementById('canvas-keep-alive');
+
   let webLockRef = null;
+  let subAudibleAudioCtx = null;
+  let subAudibleOscillator = null;
+  let subAudibleGainNode = null;
+  let canvasStream = null;
+  let keepAliveWorker = null;
+
+  function startSubAudibleOscillator() {
+    try {
+      if (!subAudibleAudioCtx) {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtxClass) {
+          subAudibleAudioCtx = new AudioCtxClass();
+        }
+      }
+      if (subAudibleAudioCtx && subAudibleAudioCtx.state === 'suspended') {
+        subAudibleAudioCtx.resume().catch(() => {});
+      }
+      if (subAudibleAudioCtx && !subAudibleOscillator) {
+        subAudibleOscillator = subAudibleAudioCtx.createOscillator();
+        subAudibleGainNode = subAudibleAudioCtx.createGain();
+        
+        // 20 Hz sub-audible frequency (imperceptible to human ear)
+        subAudibleOscillator.type = 'sine';
+        subAudibleOscillator.frequency.setValueAtTime(20, subAudibleAudioCtx.currentTime);
+
+        // Sub-audible gain (0.0001) - emits real PCM buffer frames to OS audio hardware
+        subAudibleGainNode.gain.setValueAtTime(0.0001, subAudibleAudioCtx.currentTime);
+
+        subAudibleOscillator.connect(subAudibleGainNode);
+        subAudibleGainNode.connect(subAudibleAudioCtx.destination);
+        subAudibleOscillator.start();
+      }
+    } catch (e) {
+      console.warn('Sub-audible oscillator notice:', e);
+    }
+  }
+
+  function stopSubAudibleOscillator() {
+    if (subAudibleOscillator) {
+      try {
+        subAudibleOscillator.stop();
+        subAudibleOscillator.disconnect();
+      } catch (e) {}
+      subAudibleOscillator = null;
+    }
+    if (subAudibleAudioCtx && subAudibleAudioCtx.state !== 'closed') {
+      try { subAudibleAudioCtx.suspend().catch(() => {}); } catch (e) {}
+    }
+  }
+
+  function startCanvasVideoStream() {
+    if (!videoKeepAlive || !canvasKeepAlive) return;
+    try {
+      if (!canvasStream && canvasKeepAlive.captureStream) {
+        const ctx = canvasKeepAlive.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 1, 1);
+        canvasStream = canvasKeepAlive.captureStream(1); // 1 fps
+        videoKeepAlive.srcObject = canvasStream;
+      }
+      if (videoKeepAlive.srcObject) {
+        videoKeepAlive.play().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Canvas video stream notice:', e);
+    }
+  }
+
+  function stopCanvasVideoStream() {
+    if (videoKeepAlive) {
+      try { videoKeepAlive.pause(); } catch (e) {}
+    }
+  }
+
+  function initKeepAliveWorker() {
+    if (window.Worker && !keepAliveWorker) {
+      try {
+        keepAliveWorker = new Worker('/static/js/keepalive_worker.js');
+        keepAliveWorker.onmessage = function(e) {
+          if (e.data && e.data.type === 'tick') {
+            if (state.isPlaying && activeAudio && !activeAudio.paused) {
+              updateMediaSessionPosition();
+            }
+          }
+        };
+      } catch (err) {
+        console.warn('Keep-alive worker notice:', err);
+      }
+    }
+  }
+
+  function startKeepAliveWorker() {
+    initKeepAliveWorker();
+    if (keepAliveWorker) {
+      keepAliveWorker.postMessage('start');
+    }
+  }
+
+  function stopKeepAliveWorker() {
+    if (keepAliveWorker) {
+      keepAliveWorker.postMessage('stop');
+    }
+  }
 
   async function acquireWebLock() {
     if ('locks' in navigator && !webLockRef) {
@@ -883,6 +989,9 @@ document.addEventListener('DOMContentLoaded', () => {
       audioKeepAlive.volume = 0.001; // Tiny silent audio stream to keep OS audio focus active
       audioKeepAlive.play().catch(() => {});
     }
+    startSubAudibleOscillator();
+    startCanvasVideoStream();
+    startKeepAliveWorker();
     acquireWebLock();
   }
 
@@ -890,6 +999,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (audioKeepAlive) {
       audioKeepAlive.pause();
     }
+    stopSubAudibleOscillator();
+    stopCanvasVideoStream();
+    stopKeepAliveWorker();
     releaseWebLock();
   }
 
