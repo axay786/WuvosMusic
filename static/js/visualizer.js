@@ -16,6 +16,30 @@ class AudioVisualizer {
     this.simPhase = 0;
   }
 
+  setAudioElement(newAudioElement) {
+    if (!newAudioElement || this.audio === newAudioElement) return;
+    const isPlaying = this.audio && !this.audio.paused;
+    this.audio = newAudioElement;
+
+    this.audio.addEventListener('play', () => this.startLoop());
+    this.audio.addEventListener('pause', () => this.stopLoop());
+    this.audio.addEventListener('ended', () => this.stopLoop());
+
+    if (this.isInitialized && !this.useSimulated && this.audioCtx && this.source) {
+      try {
+        this.source.disconnect();
+        this.source = this.audioCtx.createMediaElementSource(newAudioElement);
+        this.source.connect(this.analyser);
+      } catch (e) {
+        console.warn('AudioVisualizer source rebind notice (using simulated fallback):', e);
+        this.useSimulated = true;
+      }
+    }
+    if (isPlaying && !document.hidden) {
+      this.startLoop();
+    }
+  }
+
   init() {
     if (this.isInitialized) return;
     try {

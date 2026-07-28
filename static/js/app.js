@@ -16,7 +16,19 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // DOM Elements
-  const audio = document.getElementById('audio-engine');
+  const audioEngineA = document.getElementById('audio-engine-a') || document.getElementById('audio-engine');
+  let audioEngineB = document.getElementById('audio-engine-b');
+  if (!audioEngineB) {
+    audioEngineB = document.createElement('audio');
+    audioEngineB.id = 'audio-engine-b';
+    audioEngineB.preload = 'auto';
+    document.body.appendChild(audioEngineB);
+  }
+
+  let activeAudio = audioEngineA;
+  let standbyAudio = audioEngineB;
+  let preloadedSongId = null;
+
   const themeToggleBtn = document.getElementById('theme-toggle');
   const themeLabel = document.getElementById('theme-label');
   const viewPanes = document.querySelectorAll('.view-pane');
@@ -340,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function initVisualizer() {
     const canvas = document.getElementById('audio-visualizer');
     if (canvas && window.AudioVisualizer) {
-      state.visualizer = new AudioVisualizer(audio, canvas);
+      state.visualizer = new AudioVisualizer(activeAudio, canvas);
     }
   }
 
@@ -758,17 +770,88 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = html;
   }
 
-  // --- AUDIO CONTROLLER ---
-  const nextAudioPreloader = new Audio();
-  nextAudioPreloader.preload = 'auto';
+  // --- AUDIO CONTROLLER & BACKGROUND BLOB PRELOADER ---
+  const blobCache = new Map(); // songId -> { rawUrl: string, blobUrl: string }
+  const MAX_CACHE_SIZE = 6;
 
-  function preloadNextSong() {
+  function cleanupBlobCache() {
+    if (blobCache.size > MAX_CACHE_SIZE) {
+      const keys = Array.from(blobCache.keys());
+      const activeSongId = (state.currentIndex >= 0 && state.queue[state.currentIndex]) ? state.queue[state.currentIndex].id : null;
+      const nextIdx = state.queue.length > 0 ? (state.currentIndex + 1) % state.queue.length : -1;
+      const nextSongId = nextIdx >= 0 ? state.queue[nextIdx]?.id : null;
+      const prevIdx = state.queue.length > 0 ? (state.currentIndex - 1 + state.queue.length) % state.queue.length : -1;
+      const prevSongId = prevIdx >= 0 ? state.queue[prevIdx]?.id : null;
+
+      for (const key of keys) {
+        if (blobCache.size <= MAX_CACHE_SIZE) break;
+        if (key !== activeSongId && key !== nextSongId && key !== prevSongId) {
+          const item = blobCache.get(key);
+          if (item && item.blobUrl && item.blobUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(item.blobUrl);
+          }
+          blobCache.delete(key);
+        }
+      }
+    }
+  }
+
+  async function fetchAndCacheSongBlob(song) {
+    if (!song || !song.id) return null;
+    if (blobCache.has(song.id)) {
+      return blobCache.get(song.id).blobUrl;
+    }
+
+    let rawPlayUrl = song.stream_url || song.raw_url;
+    let playUrl = sanitizeAudioUrl(rawPlayUrl, song.rel_path);
+
+    if (!playUrl && song.rel_path) {
+      const config = await loadGitConfig();
+      const match = reMatchGithub(config.repo_url);
+      if (match) {
+        const branch = config.branch || "main";
+        const quotedRelPath = song.rel_path.split('/').map(encodeURIComponent).join('/');
+        playUrl = `https://raw.githubusercontent.com/${match.owner}/${match.repo}/${branch}/${quotedRelPath}`;
+      }
+    }
+
+    if (!playUrl) return null;
+
+    try {
+      const res = await fetch(playUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      cleanupBlobCache();
+      blobCache.set(song.id, { rawUrl: playUrl, blobUrl: blobUrl });
+      return blobUrl;
+    } catch (err) {
+      console.warn(`Fallback to direct network stream for ${song.title}:`, err);
+      blobCache.set(song.id, { rawUrl: playUrl, blobUrl: playUrl });
+      return playUrl;
+    }
+  }
+
+  async function preloadNextSong() {
     if (state.queue.length <= 1 || state.currentIndex === -1) return;
     const nextIdx = (state.currentIndex + 1) % state.queue.length;
     const nextSong = state.queue[nextIdx];
-    if (nextSong && (nextSong.stream_url || nextSong.raw_url)) {
-      nextAudioPreloader.src = nextSong.stream_url || nextSong.raw_url;
-      nextAudioPreloader.load();
+    if (!nextSong) return;
+
+    // Pre-fetch previous song in queue as well
+    const prevIdx = (state.currentIndex - 1 + state.queue.length) % state.queue.length;
+    const prevSong = state.queue[prevIdx];
+    if (prevSong && prevIdx !== nextIdx && prevIdx !== state.currentIndex) {
+      fetchAndCacheSongBlob(prevSong);
+    }
+
+    const cachedUrl = await fetchAndCacheSongBlob(nextSong);
+    if (cachedUrl && standbyAudio) {
+      preloadedSongId = nextSong.id;
+      if (standbyAudio.src !== cachedUrl) {
+        standbyAudio.src = cachedUrl;
+        standbyAudio.load();
+      }
     }
   }
 
@@ -828,22 +911,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update UI immediately for instantaneous feedback
     updatePlayerUI(song);
 
-    let rawPlayUrl = song.stream_url || song.raw_url;
-    let playUrl = sanitizeAudioUrl(rawPlayUrl, song.rel_path);
+    // Instant swap path if song is preloaded on standby audio engine
+    if (preloadedSongId === song.id && standbyAudio && (standbyAudio.readyState >= 2 || standbyAudio.src)) {
+      const oldActive = activeAudio;
+      activeAudio = standbyAudio;
+      standbyAudio = oldActive;
 
-    if (!playUrl && song.rel_path) {
-      const config = await loadGitConfig();
-      const match = reMatchGithub(config.repo_url);
-      if (match) {
-        const branch = config.branch || "main";
-        const quotedRelPath = song.rel_path.split('/').map(encodeURIComponent).join('/');
-        playUrl = `https://raw.githubusercontent.com/${match.owner}/${match.repo}/${branch}/${quotedRelPath}`;
+      oldActive.pause();
+      oldActive.currentTime = 0;
+
+      preloadedSongId = null;
+
+      if (state.visualizer && state.visualizer.setAudioElement) {
+        state.visualizer.setAudioElement(activeAudio);
       }
-    }
 
-    if (playUrl) {
-      audio.src = playUrl;
-      audio.play().then(() => {
+      activeAudio.volume = oldActive.volume;
+
+      activeAudio.play().then(() => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
@@ -854,7 +939,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         preloadNextSong();
       }).catch(err => {
-        console.error('Audio play error:', err, playUrl);
+        console.error('Audio play error on instant standby swap:', err);
+      });
+      return;
+    }
+
+    // Direct playback path using pre-fetched Blob URL
+    let targetUrl = null;
+    if (blobCache.has(song.id)) {
+      targetUrl = blobCache.get(song.id).blobUrl;
+    } else {
+      let rawPlayUrl = song.stream_url || song.raw_url;
+      targetUrl = sanitizeAudioUrl(rawPlayUrl, song.rel_path);
+
+      if (!targetUrl && song.rel_path) {
+        const config = await loadGitConfig();
+        const match = reMatchGithub(config.repo_url);
+        if (match) {
+          const branch = config.branch || "main";
+          const quotedRelPath = song.rel_path.split('/').map(encodeURIComponent).join('/');
+          targetUrl = `https://raw.githubusercontent.com/${match.owner}/${match.repo}/${branch}/${quotedRelPath}`;
+        }
+      }
+      fetchAndCacheSongBlob(song);
+    }
+
+    if (targetUrl) {
+      if (state.visualizer && state.visualizer.setAudioElement) {
+        state.visualizer.setAudioElement(activeAudio);
+      }
+
+      activeAudio.src = targetUrl;
+      activeAudio.play().then(() => {
+        state.isPlaying = true;
+        ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
+        playerCover.classList.add('playing');
+        requestWakeLock();
+        if (state.visualizer) {
+          state.visualizer.init();
+          state.visualizer.resume();
+        }
+        preloadNextSong();
+      }).catch(err => {
+        console.error('Audio play error:', err, targetUrl);
       });
     }
   }
@@ -866,7 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (state.isPlaying) {
-      audio.pause();
+      activeAudio.pause();
       state.isPlaying = false;
       ctrlPlayPause.innerHTML = '<i class="ri-play-fill"></i>';
       playerCover.classList.remove('playing');
@@ -876,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       syncNativeMediaState();
     } else {
-      audio.play().then(() => {
+      activeAudio.play().then(() => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
@@ -896,8 +1023,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // If Repeat Single Song mode is active, loop current song
     if (state.repeatMode === 'one') {
-      audio.currentTime = 0;
-      audio.play().then(() => {
+      activeAudio.currentTime = 0;
+      activeAudio.play().then(() => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
@@ -919,8 +1046,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // If Repeat Single Song mode is active, loop current song
     if (state.repeatMode === 'one') {
-      audio.currentTime = 0;
-      audio.play().then(() => {
+      activeAudio.currentTime = 0;
+      activeAudio.play().then(() => {
         state.isPlaying = true;
         ctrlPlayPause.innerHTML = '<i class="ri-pause-fill"></i>';
         playerCover.classList.add('playing');
@@ -976,12 +1103,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateMediaSessionPosition() {
     if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      if (activeAudio.duration && !isNaN(activeAudio.duration) && isFinite(activeAudio.duration)) {
         try {
           navigator.mediaSession.setPositionState({
-            duration: audio.duration,
-            playbackRate: audio.playbackRate || 1,
-            position: audio.currentTime || 0
+            duration: activeAudio.duration,
+            playbackRate: activeAudio.playbackRate || 1,
+            position: activeAudio.currentTime || 0
           });
         } catch (e) {}
       }
@@ -995,8 +1122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const title = song.title || 'Unknown Track';
     const artist = song.artist || 'Unknown Artist';
     const album = song.album || 'Wuvos';
-    const duration = audio.duration || 0;
-    const position = audio.currentTime || 0;
+    const duration = activeAudio.duration || 0;
+    const position = activeAudio.currentTime || 0;
     const isPlaying = state.isPlaying;
     const coverBase64 = getSongArtworkUrl(song);
 
@@ -1010,8 +1137,8 @@ document.addEventListener('DOMContentLoaded', () => {
   window.wuvosPlayPrev = function() { playPrevSong(); };
   window.wuvosTogglePlay = function() { togglePlayPause(); };
   window.wuvosSeekTo = function(seconds) {
-    if (audio) {
-      audio.currentTime = seconds;
+    if (activeAudio) {
+      activeAudio.currentTime = seconds;
       updateMediaSessionPosition();
       syncNativeMediaState();
     }
@@ -1153,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', () => {
           playNextSong();
         });
         navigator.mediaSession.setActionHandler('stop', () => {
-          audio.pause();
+          activeAudio.pause();
           state.isPlaying = false;
           ctrlPlayPause.innerHTML = '<i class="ri-play-fill"></i>';
           playerCover.classList.remove('playing');
@@ -1165,19 +1292,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if ('setPositionState' in navigator.mediaSession) {
           navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (details.seekTime !== undefined && audio.duration) {
-              audio.currentTime = details.seekTime;
+            if (details.seekTime !== undefined && activeAudio.duration) {
+              activeAudio.currentTime = details.seekTime;
               updateMediaSessionPosition();
             }
           });
           navigator.mediaSession.setActionHandler('seekbackward', (details) => {
             const skipTime = details.seekOffset || 10;
-            audio.currentTime = Math.max(audio.currentTime - skipTime, 0);
+            activeAudio.currentTime = Math.max(activeAudio.currentTime - skipTime, 0);
             updateMediaSessionPosition();
           });
           navigator.mediaSession.setActionHandler('seekforward', (details) => {
             const skipTime = details.seekOffset || 10;
-            audio.currentTime = Math.min(audio.currentTime + skipTime, audio.duration);
+            activeAudio.currentTime = Math.min(activeAudio.currentTime + skipTime, activeAudio.duration);
             updateMediaSessionPosition();
           });
         }
@@ -1187,12 +1314,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let lastNativeSyncTime = 0;
-    audio.addEventListener('timeupdate', () => {
-      if (audio.duration) {
-        const pct = (audio.currentTime / audio.duration) * 100;
+    const onAudioTimeUpdate = (e) => {
+      if (e.target !== activeAudio) return;
+      if (activeAudio.duration) {
+        const pct = (activeAudio.currentTime / activeAudio.duration) * 100;
         seekBarFill.style.width = `${pct}%`;
-        timeCurrent.textContent = formatTime(audio.currentTime);
-        timeTotal.textContent = formatTime(audio.duration);
+        timeCurrent.textContent = formatTime(activeAudio.currentTime);
+        timeTotal.textContent = formatTime(activeAudio.duration);
         updateMediaSessionPosition();
 
         const now = Date.now();
@@ -1201,32 +1329,43 @@ document.addEventListener('DOMContentLoaded', () => {
           syncNativeMediaState();
         }
       }
-    });
+    };
 
-    audio.addEventListener('ended', () => {
+    const onAudioEnded = (e) => {
+      if (e.target !== activeAudio) return;
       if (state.repeatMode === 'one') {
-        audio.currentTime = 0;
-        audio.play();
+        activeAudio.currentTime = 0;
+        activeAudio.play();
       } else {
         playNextSong();
       }
-    });
+    };
 
-    audio.addEventListener('error', (e) => {
-      console.warn('Audio element error encountered:', e, audio.error);
+    const onAudioError = (e) => {
+      if (e.target !== activeAudio) return;
+      console.warn('Audio element error encountered:', e, activeAudio.error);
       if (state.isPlaying) {
         setTimeout(() => {
           playNextSong();
         }, 1500);
       }
-    });
+    };
+
+    audioEngineA.addEventListener('timeupdate', onAudioTimeUpdate);
+    audioEngineB.addEventListener('timeupdate', onAudioTimeUpdate);
+
+    audioEngineA.addEventListener('ended', onAudioEnded);
+    audioEngineB.addEventListener('ended', onAudioEnded);
+
+    audioEngineA.addEventListener('error', onAudioError);
+    audioEngineB.addEventListener('error', onAudioError);
 
     seekBarContainer.addEventListener('click', (e) => {
       const rect = seekBarContainer.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const pct = clickX / rect.width;
-      if (audio.duration) {
-        audio.currentTime = pct * audio.duration;
+      if (activeAudio.duration) {
+        activeAudio.currentTime = pct * activeAudio.duration;
       }
     });
 
@@ -1234,19 +1373,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const rect = volumeBarContainer.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const vol = Math.max(0, Math.min(1, clickX / rect.width));
-      audio.volume = vol;
+      audioEngineA.volume = vol;
+      audioEngineB.volume = vol;
       volumeBarFill.style.width = `${vol * 100}%`;
     });
 
     volumeIcon.addEventListener('click', () => {
-      if (audio.volume > 0) {
-        audio.dataset.prevVol = audio.volume;
-        audio.volume = 0;
+      if (activeAudio.volume > 0) {
+        const prev = activeAudio.volume;
+        audioEngineA.dataset.prevVol = prev;
+        audioEngineB.dataset.prevVol = prev;
+        audioEngineA.volume = 0;
+        audioEngineB.volume = 0;
         volumeBarFill.style.width = '0%';
         volumeIcon.innerHTML = '<i class="ri-volume-mute-fill"></i>';
       } else {
-        const prev = parseFloat(audio.dataset.prevVol || '0.8');
-        audio.volume = prev;
+        const prev = parseFloat(activeAudio.dataset.prevVol || '0.8');
+        audioEngineA.volume = prev;
+        audioEngineB.volume = prev;
         volumeBarFill.style.width = `${prev * 100}%`;
         volumeIcon.innerHTML = '<i class="ri-volume-up-fill"></i>';
       }
