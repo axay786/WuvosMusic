@@ -795,23 +795,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.visibilityState === 'visible' && state.isPlaying) {
       requestWakeLock();
     }
-    // Belt-and-braces: whichever direction we're switching, try to nudge
-    // the AudioContext back into "running" state if it's playing but the
-    // context got suspended by the browser's background power-saving policy.
     if (state.isPlaying && state.visualizer) {
       state.visualizer.resume();
     }
   });
-
-  // Some mobile browsers (notably Android Chrome) suspend the AudioContext
-  // a few seconds after backgrounding even if the tab is still executing
-  // timers. Poll periodically while a track is playing so we resume it
-  // right away instead of only on the next visibilitychange/foreground.
-  setInterval(() => {
-    if (state.isPlaying && state.visualizer) {
-      state.visualizer.resume();
-    }
-  }, 2000);
 
   function sanitizeAudioUrl(url, relPath) {
     let target = url || '';
