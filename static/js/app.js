@@ -855,6 +855,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // --- SAMSUNG / ANDROID BACKGROUND AUDIO KEEP-ALIVE ---
+  const audioKeepAlive = document.getElementById('audio-keep-alive');
+  let webLockRef = null;
+
+  async function acquireWebLock() {
+    if ('locks' in navigator && !webLockRef) {
+      try {
+        navigator.locks.request('wuvos_background_audio', { mode: 'exclusive' }, () => {
+          return new Promise((resolve) => {
+            webLockRef = resolve;
+          });
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }
+
+  function releaseWebLock() {
+    if (webLockRef) {
+      webLockRef();
+      webLockRef = null;
+    }
+  }
+
+  function startBackgroundKeepAlive() {
+    if (audioKeepAlive) {
+      audioKeepAlive.volume = 0.001; // Tiny silent audio stream to keep OS audio focus active
+      audioKeepAlive.play().catch(() => {});
+    }
+    acquireWebLock();
+  }
+
+  function stopBackgroundKeepAlive() {
+    if (audioKeepAlive) {
+      audioKeepAlive.pause();
+    }
+    releaseWebLock();
+  }
+
   let wakeLockObj = null;
 
   async function requestWakeLock() {
@@ -865,6 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (err) {}
     }
+    startBackgroundKeepAlive();
   }
 
   function releaseWakeLock() {
@@ -872,6 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { wakeLockObj.release(); } catch (err) {}
       wakeLockObj = null;
     }
+    stopBackgroundKeepAlive();
   }
 
   document.addEventListener('visibilitychange', async () => {
@@ -1284,6 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
           state.isPlaying = false;
           ctrlPlayPause.innerHTML = '<i class="ri-play-fill"></i>';
           playerCover.classList.remove('playing');
+          releaseWakeLock();
           if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
           if (window.AndroidBridge && window.AndroidBridge.stopMediaService) {
             window.AndroidBridge.stopMediaService();

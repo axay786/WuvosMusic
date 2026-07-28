@@ -1,4 +1,0 @@
-<resources>
-    <string name="app_name">Wuvos Music</string>
-    <string name="default_server_url">file:///android_asset/index.html</string>
-</resources>

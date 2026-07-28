@@ -256,6 +256,18 @@
   <audio id="audio-engine-a" preload="auto"></audio>
   <audio id="audio-engine-b" preload="auto"></audio>
   <audio id="audio-engine" preload="auto"></audio>
+  <!-- Silent Background Audio Keep-Alive for Samsung/Android Lock Screen -->
+  <audio id="audio-keep-alive" loop preload="auto" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/static/sw.js').catch(function(err) {
+          console.warn('ServiceWorker registration notice:', err);
+        });
+      });
+    }
+  </script>
 
   <!-- Theme Selector Modal -->
   <div class="theme-modal-overlay" id="theme-modal-overlay">

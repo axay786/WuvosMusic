@@ -1,7 +1,0 @@
-{
-  "repo_url": "https://github.com/axay786/Wuvos.git",
-  "branch": "main",
-  "token": "",
-  "auto_sync_on_start": false,
-  "notes": "Add your personal Git repository URL, branch, and access token (PAT) here. Adding a free GitHub Personal Access Token increases GitHub API rate limits from 60 requests/hour to 5,000 requests/hour."
-}
